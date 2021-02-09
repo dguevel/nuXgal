@@ -105,7 +105,7 @@ effective area files to match the format of the 3 year data')
     # iterate over files in the input directory
     for fname in os.listdir(args.input):
         # check if file is effective area file and capture year
-        match = re.match('^(?P<year>IC[0-9]{2}[_I]{0,3})_effectiveArea.csv$', fname)
+        match = re.match('^(?P<year>IC[0-9]{2}[_IV]{0,4})_effectiveArea.csv$', fname)
         if match:
 
             fullpath = os.path.join(args.input, fname)
