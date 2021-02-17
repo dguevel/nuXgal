@@ -18,7 +18,7 @@ parser.add_argument("-o", "--output", default=Defaults.NUXGAL_DIR,
 
 args = parser.parse_args()
 
-icecube_data_dir = os.path.join(args.input, 'data/3year-data-release')
+icecube_data_dir = os.path.join(args.input, 'data/icecube_10year_ps/events')
 data_dir = os.path.join(args.output, 'data', 'data')
 irf_dir = os.path.join(args.output, 'data', 'irfs')
 plot_dir = os.path.join(args.output, 'plots')
@@ -36,7 +36,7 @@ def geneateNcos_thetaFile(year):
     Nzenith_bin = 100
     N_coszenith = np.zeros((len(Defaults.map_logE_center), Nzenith_bin))
 
-    for file in [os.path.join(icecube_data_dir, year + '-events.txt')]:
+    for file in [os.path.join(icecube_data_dir, year + '_exp.csv')]:
 
         AtmBG_file = np.loadtxt(file)
         _index_map_logE = np.searchsorted(Defaults.map_logE_edge, AtmBG_file[:, 1]) - 1
@@ -64,7 +64,7 @@ def geneateNcos_thetaFile(year):
 
 def generateCountsmap(year):
     countsmap = np.zeros((Defaults.NEbin, hp.pixelfunc.nside2npix(Defaults.NSIDE)))
-    AtmBG_file = np.loadtxt(os.path.join(icecube_data_dir, year+'-events.txt'))
+    AtmBG_file = np.loadtxt(os.path.join(icecube_data_dir, year+'_exp.csv'))
 
     # get energy index of events
     _index_map_logE = np.searchsorted(Defaults.map_logE_edge, AtmBG_file[:, 1]) - 1
@@ -82,7 +82,7 @@ def generateCountsmap(year):
 
 if __name__ == '__main__':
     countsmap = np.zeros((Defaults.NEbin, hp.pixelfunc.nside2npix(Defaults.NSIDE)))
-    for year in ['IC79-2010', 'IC86-2011', 'IC86-2012']:
+    for year in ['IC40', 'IC59', 'IC79', 'IC86_I', 'IC86_II', 'IC86_III', 'IC86_IV', 'IC86_V', 'IC86_VI', 'IC86_VII']:
         geneateNcos_thetaFile(year)
         countsmap = countsmap + generateCountsmap(year)
 

@@ -25,6 +25,10 @@ countsmappath = os.path.join(Defaults.NUXGAL_DATA_DIR, 'IceCube3yr_countsmap{i}.
 IC3yr = NeutrinoSample()
 IC3yr.inputData(countsmappath)
 
+countsmappath = os.path.join(Defaults.NUXGAL_DATA_DIR, 'IceCube10yr_countsmap{i}.fits')
+IC10yr = NeutrinoSample()
+IC10yr.inputData(countsmappath)
+
 
 def CompareNeutrinoMaps(energyBin=2, plotcount=False, plotoverdensity=False, plotpowerspectrum=False, plotcostheta=True):
     IC3yr.updateMask(Defaults.idx_muon)
@@ -195,24 +199,24 @@ def TS_distributionPlot(galaxyName, lmin,  pdf=False, N_re=10000):
     colors_astro = ['royalblue', 'deepskyblue']
 
     plt.plot([], [], colors_atm[0], lw=2, label='Atm. only')
-    plt.plot([], [], colors_astro[0], lw=3, label='Atm. + Astro. 3 yr' )
+    #plt.plot([], [], colors_astro[0], lw=3, label='Atm. + Astro. 3 yr' )
     plt.plot([], [], colors_astro[1], lw=6, label='Atm. + Astro. 10 yr' )
 
 
     # 10yr
     TS_atm = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_0_'+galaxyName+'_10.txt'))
-    TS_astro1 = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_10_observed_numu_fraction1.txt'))
-    TS_astro2 = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_10_observed_numu_fraction2.txt'))
+    TS_astro1 = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_10_observed_numu_fraction1_real.txt'))
+    TS_astro2 = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_10_observed_numu_fraction2_real.txt'))
 
     # 3yr
-    TS_astro1_3yr = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_3_observed_numu_fraction1.txt'))
+    #TS_astro1_3yr = np.loadtxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR,'TS_1_'+galaxyName+'_3_observed_numu_fraction1.txt'))
 
     TS2p = lambda TS: np.histogram(TS, TS_bins)[0] / float(len(TS))
 
     plt.plot(TS_bins_c, 1 - (stats.chi2.cdf(TS_bins_c, 3)),'--', color='silver', lw=6, label=r'$\chi^2$ (dof=3)')
     plt.step(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_atm)), lw=3, color=colors_atm,  where='post')
 
-    plt.step(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1_3yr)), lw=4, color=colors_astro[0],  where='post')
+    #plt.step(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1_3yr)), lw=4, color=colors_astro[0],  where='post')
 
 
     plt.fill_between(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1)), 1 - np.cumsum(TS2p(TS_astro2)), step='post', alpha=0.4, color=colors_astro[1])
@@ -271,15 +275,22 @@ def Projected10yr(readdata=True, plotMCMC=False):
 
 def SED_3yr(plotMCMC=False):
     ns = IC3yr
-    N_yr = 3
+    N_yr = 3 
+    BestfitModel(ns=ns, N_yr=N_yr, galaxyName='WISE', lmin=50, Ebinmin=1, Ebinmax=4, plotMCMC=plotMCMC, plotSED=True)
+
+def SED_10yr(plotMCMC=False):
+    ns = IC10yr
+    N_yr = 10
     BestfitModel(ns=ns, N_yr=N_yr, galaxyName='WISE', lmin=50, Ebinmin=1, Ebinmax=4, plotMCMC=plotMCMC, plotSED=True)
 
 
 if __name__ == '__main__':
-    CompareNeutrinoMaps(energyBin=2, plotcount=True, plotoverdensity=True, plotpowerspectrum=True, plotcostheta=True)
-    GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True)
+    #CompareNeutrinoMaps(energyBin=2, plotcount=True, plotoverdensity=True, plotpowerspectrum=True, plotcostheta=True)
+    #GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True)
     #TS_distribution_calculate(3, galaxyName='WISE', computeSTD=computeSTD, Ebinmin=1, Ebinmax=4, lmin=lmin, N_re = N_re)
+    #TS_distribution_calculate(10, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re=200)
     #TS_distribution_calculate(10, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 200)
-    #TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
+    TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
     #SED_3yr(plotMCMC=False)
+    #SED_10yr(plotMCMC=True)
     #Projected10yr(readdata=True, plotMCMC=False)

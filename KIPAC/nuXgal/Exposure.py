@@ -41,15 +41,15 @@ class WeightedAeff():
     def readTables(self):
         """Read the Effective area tabels for a particular year"""
         Aeff_file = np.loadtxt(Defaults.TABULATED_AEFF_FORMAT.format(year=self.year))
-        # effective area, 200 in cos zenith, 70 in E
+        # effective area, 50 in cos zenith, 40 in E
         self.Aeff_table = Aeff_file[:, 4]
-        Emin_eff = np.reshape(Aeff_file[:, 0], (70, 200))[:, 0]
+        Emin_eff = np.reshape(Aeff_file[:, 0], (40, 50))[:, 0]
         self.Emin_eff = Emin_eff
         self.Ec_eff_len = len(Emin_eff)
         logE_eff = np.log10(Emin_eff)
         self.dlogE_eff = np.mean(logE_eff[1:] - logE_eff[0:-1])
         self.Ec_eff = Emin_eff * 10. ** (0.5 * self.dlogE_eff)
-        self.cosZenith_min = np.reshape(Aeff_file[:, 2], (70, 200))[0]
+        self.cosZenith_min = np.reshape(Aeff_file[:, 2], (40, 50))[0]
         exposuremap_costheta = np.cos(np.pi - Defaults.exposuremap_theta) # converting to South pole view
         self.index_coszenith = np.searchsorted(self.cosZenith_min, exposuremap_costheta) - 1
 
@@ -75,7 +75,7 @@ class WeightedAeff():
             #                     Defaults.map_E_edge[i], Defaults.map_E_edge[i+1], factor_i)
             for j in np.arange(jstart, jend):
                 weightedAeff[i] += np.power(self.Ec_eff[j], 1 - spectralIndex) /\
-                    self.Aeff_table[j * 200 + self.index_coszenith]
+                    self.Aeff_table[j * 50 + self.index_coszenith]
             weightedAeff[i] = factor_i / weightedAeff[i]
         return weightedAeff
 

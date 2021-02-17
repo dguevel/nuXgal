@@ -277,13 +277,30 @@ class Likelihood():
         TS_array : `np.array`
             The array of TS values
         """
-        eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
-        eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
-        eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
+        #eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
+        #eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
+        #eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
+
+        eg_list = [
+            EventGenerator('IC40', astroModel=astroModel),
+            EventGenerator('IC59', astroModel=astroModel),
+            EventGenerator('IC79', astroModel=astroModel),
+            EventGenerator('IC86_I', astroModel=astroModel),
+            EventGenerator('IC86_II', astroModel=astroModel),
+            EventGenerator('IC86_III', astroModel=astroModel),
+            EventGenerator('IC86_IV', astroModel=astroModel),
+            EventGenerator('IC86_V', astroModel=astroModel),
+            EventGenerator('IC86_VI', astroModel=astroModel),
+            EventGenerator('IC86_VII', astroModel=astroModel)
+            ]
 
         TS_array = np.zeros(N_re)
         for i in range(N_re):
-            if self.N_yr != 3:
+            if self.N_yr == 10:
+                datamap = eg_list[0].SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
+                for eg in eg_list[1:]:
+                    datamap += eg.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
+            elif self.N_yr != 3:
                 datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
                     eg_2011.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density) +\
                     eg_2012.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density)
@@ -307,6 +324,7 @@ class Likelihood():
                 TSpath = Defaults.SYNTHETIC_TS_SIGNAL_FORMAT.format(f_diff=str(f_diff), galaxyName=self.gs.galaxyName, nyear=str(self.N_yr), astroModel=astroModel)
 
             np.savetxt(TSpath, TS_array)
+            print(TSpath)
         return TS_array
 
 
@@ -346,7 +364,8 @@ class Likelihood():
         # common x for castro object initialization
         f_Ebin = np.linspace(0, 4, 1000)
 
-        exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
+        #exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
+        exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86_II', 2.28)
 
         for idx_E in range(self.Ebinmin, self.Ebinmax):
             # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
