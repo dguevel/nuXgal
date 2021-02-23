@@ -140,24 +140,33 @@ class Likelihood():
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
         ns = NeutrinoSample()
-        eg_2010 = EventGenerator('IC79-2010')
-        eg_2011 = EventGenerator('IC86-2011')
-        eg_2012 = EventGenerator('IC86-2012')
+        #eg_2010 = EventGenerator('IC79-2010')
+        #eg_2011 = EventGenerator('IC86-2011')
+        #eg_2012 = EventGenerator('IC86-2012')
 
+        eg_list = [
+            EventGenerator('IC40'),
+            EventGenerator('IC59'),
+            EventGenerator('IC79'),
+            EventGenerator('IC86_I'),
+            EventGenerator('IC86_II'),
+            EventGenerator('IC86_III'),
+            EventGenerator('IC86_IV'),
+            EventGenerator('IC86_V'),
+            EventGenerator('IC86_VI'),
+            EventGenerator('IC86_VII')
+            ]
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
-            eg_2010.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2010.nevts * 1.), clear_parent=False)
 
-            if self.N_yr != 3:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
+            if self.N_yr != 10:
+                raise ValueError("Removed functionality for 3-year data in this branch. Use master.")
 
-            else:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * 1.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * 1.), clear_parent=False)
+            for eg in eg_list:
+                eg.atm_gen.nevents_expected.set_value(np.random.poisson(eg.nevts * 1.), clear_parent=False)
 
-            eventmap_atm = eg_2010.atm_gen.generate_event_maps(1)[0] + eg_2011.atm_gen.generate_event_maps(1)[0] + eg_2012.atm_gen.generate_event_maps(1)[0]
+            eventmap_atm = sum([eg.atm_gen.generate_event_maps(1)[0] for eg in eg_list])
 
             ns.inputCountsmap(eventmap_atm)
             ns.updateMask(self.idx_mask)
