@@ -5,6 +5,7 @@ import numpy as np
 import healpy as hp
 import emcee
 import corner
+import csky as cy
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -13,6 +14,7 @@ from scipy.optimize import minimize
 from scipy.stats import norm, distributions
 
 from .EventGenerator import EventGenerator
+from .CskyEventGenerator import CskyEventGenerator
 from . import Defaults
 from .NeutrinoSample import NeutrinoSample
 from .FermipyCastro import LnLFn
@@ -56,7 +58,7 @@ def significance_from_chi(chi):
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin):
+    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, use_csky=True):
         """C'tor
 
         Parameters
@@ -83,6 +85,7 @@ class Likelihood():
         self.N_yr = N_yr
         self.w_data = None
         self.Ncount = None
+        self.use_csky = use_csky
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -140,24 +143,38 @@ class Likelihood():
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
         ns = NeutrinoSample()
-        eg_2010 = EventGenerator('IC79-2010')
-        eg_2011 = EventGenerator('IC86-2011')
-        eg_2012 = EventGenerator('IC86-2012')
 
+        if self.use_csky:
+            if self.N_yr == 3:
+                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+            elif self.N_yr == 10:
+                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+            else:
+                raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
+
+        else:
+            eg_2010 = EventGenerator('IC79-2010')
+            eg_2011 = EventGenerator('IC86-2011')
+            eg_2012 = EventGenerator('IC86-2012')
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
-            eg_2010.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2010.nevts * 1.), clear_parent=False)
 
-            if self.N_yr != 3:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
+            if self.use_csky:
+                eventmap_atm = sum([eg.SyntheticData(1., 0.) for eg in eg_list])
 
             else:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * 1.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * 1.), clear_parent=False)
+                eg_2010.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2010.nevts * 1.), clear_parent=False)
 
-            eventmap_atm = eg_2010.atm_gen.generate_event_maps(1)[0] + eg_2011.atm_gen.generate_event_maps(1)[0] + eg_2012.atm_gen.generate_event_maps(1)[0]
+                if self.N_yr != 3:
+                    eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
+                    eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
+
+                else:
+                    eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * 1.), clear_parent=False)
+                    eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * 1.), clear_parent=False)
+
+                eventmap_atm = eg_2010.atm_gen.generate_event_maps(1)[0] + eg_2011.atm_gen.generate_event_maps(1)[0] + eg_2012.atm_gen.generate_event_maps(1)[0]
 
             ns.inputCountsmap(eventmap_atm)
             ns.updateMask(self.idx_mask)
@@ -260,7 +277,7 @@ class Likelihood():
 
 
 
-    def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):
+    def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True, return_n_inj=False):
         """Generate a Test Statistic distribution for simulated trials
 
         Parameters
@@ -277,26 +294,44 @@ class Likelihood():
         TS_array : `np.array`
             The array of TS values
         """
-        eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
-        eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
-        eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
+
+        if self.use_csky:
+            if self.N_yr == 3:
+                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+            elif self.N_yr == 10:
+                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+            else:
+                raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
+
+        else:
+            eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
+            eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
+            eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
 
         TS_array = np.zeros(N_re)
         for i in range(N_re):
-            if self.N_yr != 3:
-                datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2011.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2012.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density)
+            if self.use_csky:
+                datamap = sum([eg.SyntheticData(1., f_diff=f_diff) for eg in eg_list])
+
             else:
-                datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2011.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2012.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
+                eg_list = [eg_2010, eg_2011, eg_2012]
+                if self.N_yr != 3:
+                    datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
+                        eg_2011.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density) +\
+                        eg_2012.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density)
+                else:
+                    datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
+                        eg_2011.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
+                        eg_2012.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
+
+            n_inj = np.sum([eg.nevts * f_diff for eg in eg_list], axis=0)
+
             ns = NeutrinoSample()
             ns.inputCountsmap(datamap)
             #ns.plotCountsmap(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Figcheck'))
             self.inputData(ns)
             minimizeResult = (self.minimize__lnL())
-            print(i, self.Ncount, minimizeResult[0], minimizeResult[-1])
+            #print(i, self.Ncount, minimizeResult[0], minimizeResult[-1])
             TS_array[i] = minimizeResult[-1]
         if writeData:
             if f_diff == 0:
@@ -307,7 +342,10 @@ class Likelihood():
                 TSpath = Defaults.SYNTHETIC_TS_SIGNAL_FORMAT.format(f_diff=str(f_diff), galaxyName=self.gs.galaxyName, nyear=str(self.N_yr), astroModel=astroModel)
 
             np.savetxt(TSpath, TS_array)
-        return TS_array
+        if return_n_inj:
+            return TS_array, n_inj
+        else:
+            return TS_array
 
 
 

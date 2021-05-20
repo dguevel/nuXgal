@@ -12,24 +12,21 @@ from .Generator import AtmGenerator, AstroGenerator_v2, get_dnde_astro
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 
 
-class EventGenerator():
+class CskyEventGenerator():
     """Class to generate synthetic IceCube events
 
     This can generate both atmospheric and astrophysical events
     """
-    def __init__(self, year='IC86-2012', astroModel=None):
+    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03'):
         """C'tor
         """
+
         self.year = year
 
-        # TODO: set up data set selections
-        dsets = {
-            'IC79-2010': cy.selections.PSDataSpecs.IC79,
-            'IC86-2011': cy.selections.PSDataSpecs.IC86_2011,
-            'IC86-2012': cy.selections.PSDataSpecs.IC86v3_2012,
-        }
+        self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])# * 2.
 
-        ana = cy.get_analysis(cy.selections.repo, dsets[year])
+        ana = cy.get_analysis(cy.selections.repo, version, year)
+
         cy.CONF['ana'] = ana
         ana_dir = Defaults.NUXGAL_ANA_DIR
 
@@ -38,122 +35,31 @@ class EventGenerator():
         galaxy_map /= galaxy_map.sum()
         self.nside = hp.npix2nside(galaxy_map.size)
 
-        self.trial_runner = []
+
+        # the flux in each bin is not the correct units, but its ok because
+        # we're injecting a fixed number of events and not using csky to
+        # fit the llh
+
+        conf = {
+            'template': galaxy_map,
+            'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.f_astro_north_truth),
+            'sigsub': True,
+            'fast_weight': True,
+            'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
+        }
+
+        self.trial_runner = cy.get_trial_runner(conf)
+
+        self.nevts = []
+
+        trial, _ = self.trial_runner.get_one_trial(0)
         for emin, emax in zip(Defaults.map_E_edge, Defaults.map_E_edge[1:]):
+            # calculate number of events in the northern sky
+            idx_mask = (trial[0][0]['log10energy'] > np.log10(emin)) & (trial[0][0]['log10energy'] < np.log10(emax)) & (trial[0][0]['dec'] > np.cos(Defaults.theta_north))
+            self.nevts.append(np.sum(idx_mask))
 
-            conf = {
-                'template': galaxy_map,
-                'flux': cy.hyp.PowerLawFlux(2.5, energy_range=(emin, emax)),
-                'fitter_args': dict(gamma=2.5),
-                'sigsub': True,
-                'fast_weight': True,
-                'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
-            }
-
-            self.trial_runner.append(cy.get_trial_runner(conf))
-
-        # TODO: check if this is the correct number of events
-        trial, _ = self.trial_runner[0].get_one_trial(0)
-        self.nevts = np.sum([len(t[0]) for t in trial])
-
-        #self.astroModel = None
-        #self.Aeff_max = None
-        #self._astro_gen = None
-        #if astroModel is not None:
-        #    self.initializeAstro(astroModel)
-
-
-    def initializeAstro(self, astroModel):
-        """Initialize the event generate for a particular astrophysical model
-
-        Parameters
-        ----------
-        astroModel : `str`
-            The astrophysical model we are using
-        """
-        self.astroModel = astroModel
-
-        assert (astroModel == 'observed_numu_fraction'), "EventGenerator: incorrect astroModel"
-
-        # Fig 3 of 1908.09551
-        self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.]) * 2.
-        spectralIndex = 2.28
-
-        aeff = ICECUBE_EXPOSURE_LIBRARY.get_exposure(self.year, spectralIndex)
-        self.Aeff_max = aeff.max(1)
-        self._astro_gen = AstroGenerator_v2(Defaults.NEbin, aeff=aeff)
-
-
-    @property
-    def atm_gen(self):
-        """Astrospheric event generator"""
-        return self._atm_gen
-
-    @property
-    def astro_gen(self):
-        """Astrophysical event generator"""
-        return self._astro_gen
-
-    def astroEvent_galaxy(self, intrinsicCounts, normalized_counts_map):
-        """Generate astrophysical event maps from a galaxy
-        distribution and a number of intrinsice events
-
-        Parameters
-        ----------
-        density : `np.ndarray`
-            Galaxy density map, used as a pdf
-        intrinsicCounts : `np.ndarray`
-            True number of events, without accounting for Aeff variation
-
-        Returns
-        -------
-        counts_map : `np.ndarray`
-            Maps of simulated events
-        """
-
-        self._astro_gen.normalized_counts_map = normalized_counts_map
-        self._astro_gen.nevents_expected.set_value(intrinsicCounts, clear_parent=False)
-        return self._astro_gen.generate_event_maps(1)[0]
-
-
-
-    def atmBG_coszenith(self, eventNumber, energyBin):
-        """Generate atmospheric background cos(zenith) distributions
-
-        Parameters
-        ----------
-        eventNumber : `int`
-            Number of events to generate
-        energyBin : `int`
-            Energy bin to consider
-
-        Returns
-        -------
-        cos_z : `np.ndarray`
-            Array of synthetic cos(zenith) values
-        """
-        return self._atm_gen.cosz_cdf()[energyBin](np.random.rand(eventNumber))
-
-
-
-    def atmEvent(self, duration_year):
-        """Generate atmosphere event maps from expected rates per year
-
-        Parameters
-        ----------
-        duration_year : `float`
-            Number of eyars to generate
-
-        Returns
-        -------
-        counts_map : `np.ndarray`
-            Maps of simulated events
-        """
-        eventnumber_Ebin = np.random.poisson(self._atm_gen.nevents_expected() * duration_year)
-        self._atm_gen.nevents_expected.set_value(eventnumber_Ebin, clear_parent=False)
-        return self._atm_gen.generate_event_maps(1)[0]
-
-
+        self.nevts = np.array(self.nevts)
+        ana.save(ana_dir)
 
     def SyntheticData(self, N_yr, f_diff):
         """Generate Synthetic Data
@@ -165,8 +71,6 @@ class EventGenerator():
         f_diff : `float`
             Fraction of astro events w.r.t. diffuse muon neutrino flux,
             f_diff = 1 means injecting astro events that sum up to 100% of diffuse muon neutrino flux
-        density_nu : `np.ndarray`
-            Background neutrino density map
 
         Returns
         -----
@@ -174,21 +78,41 @@ class EventGenerator():
             Maps of simulated events
         """
 
+        trial, _ = self.trial_runner.get_one_trial((self.nevts * self.f_astro_north_truth).sum() * N_yr)
+
         data_maps = []
-        for i, tr in enumerate(self.trial_runner):
-            trial, _ = tr.get_one_trial(self.nevts * N_yr * f_diff[i], replace_evts=True)
 
-            ra = np.hstack([t[0]['ra'] for t in trial])
-            dec = np.hstack([t[0]['dec'] for t in trial])
-            atm_map = event2map(ra, dec, self.nside)
+        for i, (emin, emax) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
 
-            if f_diff[i] > 0:
-                ra = np.hstack([t[1]['ra'] for t in trial])
-                dec = np.hstack([t[1]['dec'] for t in trial])
-                astro_map = event2map(ra, dec, self.nside)
+            # create a sky map of atmospheric nu
+            atm_ra = np.hstack([t[0]['ra'] for t in trial])
+            atm_dec = np.hstack([t[0]['dec'] for t in trial])
+            atm_log10energy = np.hstack([t[0]['log10energy'] for t in trial])
+            atm_idx_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north))
+
+            atm_ra = atm_ra[atm_idx_mask]
+            atm_dec = atm_dec[atm_idx_mask]
+
+            if (f_diff > 0) and (self.f_astro_north_truth[i] > 0):
+                astro_ra = np.hstack([t[1]['ra'] for t in trial])
+                astro_dec = np.hstack([t[1]['dec'] for t in trial])
+                astro_log10energy = np.hstack([t[1]['log10energy'] for t in trial])
+                astro_idx = (astro_log10energy > emin) & (astro_log10energy < emax)
+                astro_ra = astro_ra[astro_idx]
+                astro_dec = astro_dec[astro_idx]
+
+                # remove a number of atm nu equal to the astro nu
+                if atm_ra.size - astro_ra.size < 0:
+                    atm_idx = []
+                else:
+                    atm_idx = np.random.choice(np.arange(atm_ra.size), size=atm_ra.size - astro_ra.size, replace=False)
+
+                atm_map = event2map(atm_ra[atm_idx], atm_dec[atm_idx], self.nside)
+                astro_map = event2map(astro_ra, astro_dec, self.nside)
 
             else:
-                astro_map = np.zeros(atm_map.shape)
+                atm_map = event2map(atm_ra, atm_dec, self.nside)
+                astro_map = np.zeros(hp.nside2npix(self.nside))
 
             data_maps.append(astro_map + atm_map)
 
