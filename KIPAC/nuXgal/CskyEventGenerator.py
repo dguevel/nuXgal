@@ -17,11 +17,13 @@ class CskyEventGenerator():
 
     This can generate both atmospheric and astrophysical events
     """
-    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03'):
+    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03', Ebinmin=0, Ebinmax=7):
         """C'tor
         """
 
         self.year = year
+        self.Ebinmin = Ebinmin
+        self.Ebinmax = Ebinmax
 
         self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])# * 2.
 
@@ -48,7 +50,8 @@ class CskyEventGenerator():
             'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
         }
 
-        self.trial_runner = cy.get_trial_runner(conf)
+        self.conf = conf
+        self.trial_runner = cy.get_trial_runner(self.conf)
 
         self.nevts = []
 
@@ -78,45 +81,62 @@ class CskyEventGenerator():
             Maps of simulated events
         """
 
-        trial, _ = self.trial_runner.get_one_trial((self.nevts * self.f_astro_north_truth).sum() * N_yr)
+        if np.array(f_diff).size == 1:
+            n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
+            self.n_inj = n_inj
+            trial, _ = self.trial_runner.get_one_trial(n_inj)
 
-        data_maps = []
+        else:
+            raise ValueError('Scalar f_diff only')
 
+
+        # create a sky map of atmospheric nu
+        atm_ra = np.hstack([t[0]['ra'] for t in trial])
+        atm_dec = np.hstack([t[0]['dec'] for t in trial])
+        atm_idx = np.hstack([t[0]['idx'] for t in trial])
+        atm_log10energy = np.hstack([t[0]['log10energy'] for t in trial])
+
+        if f_diff > 0:
+            astro_ra = np.hstack([t[1]['ra'] for t in trial])
+            astro_dec = np.hstack([t[1]['dec'] for t in trial])
+            astro_idx = np.hstack([t[1]['idx'] for t in trial])
+            astro_log10energy = np.hstack([t[1]['log10energy'] for t in trial])
+
+
+        data_maps = np.zeros((Defaults.NEbin, hp.nside2npix(self.nside)))
         for i, (emin, emax) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
 
-            # create a sky map of atmospheric nu
-            atm_ra = np.hstack([t[0]['ra'] for t in trial])
-            atm_dec = np.hstack([t[0]['dec'] for t in trial])
-            atm_log10energy = np.hstack([t[0]['log10energy'] for t in trial])
-            atm_idx_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north))
+            if f_diff > 0:
 
-            atm_ra = atm_ra[atm_idx_mask]
-            atm_dec = atm_dec[atm_idx_mask]
+                atm_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north)) 
+                astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
+                n_atm = atm_mask.sum() - astro_mask.sum()
+                if n_atm < 0:
+                    n_atm = 0
+                included_events = np.random.choice(atm_idx[atm_mask], size=n_atm)
 
-            if (f_diff > 0) and (self.f_astro_north_truth[i] > 0):
-                astro_ra = np.hstack([t[1]['ra'] for t in trial])
-                astro_dec = np.hstack([t[1]['dec'] for t in trial])
-                astro_log10energy = np.hstack([t[1]['log10energy'] for t in trial])
-                astro_idx = (astro_log10energy > emin) & (astro_log10energy < emax)
-                astro_ra = astro_ra[astro_idx]
-                astro_dec = astro_dec[astro_idx]
+                # TODO: add in declination selection
+                #included_events = []
+                #dec_bands = np.arange(-np.pi/2, np.pi/2 + 0.01, 0.2)
+                #for i, (dmin, dmax) in enumerate(zip(dec_bands, dec_bands[1:])):
+                    #atm_band_mask = (atm_dec > dmin) & (atm_dec < dmax) & (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north))
+                    #astro_band_mask = (astro_dec > dmin) & (astro_dec < dmax) & (astro_log10energy > emin) & (astro_log10energy < emax)
+                    #if atm_band_mask.sum() - astro_band_mask.sum() > 0:
+                        #included_events.extend(np.random.choice(atm_idx[atm_band_mask], size=atm_band_mask.sum() - astro_band_mask.sum(), replace=False))
 
-                # remove a number of atm nu equal to the astro nu
-                if atm_ra.size - astro_ra.size < 0:
-                    atm_idx = []
-                else:
-                    atm_idx = np.random.choice(np.arange(atm_ra.size), size=atm_ra.size - astro_ra.size, replace=False)
 
-                atm_map = event2map(atm_ra[atm_idx], atm_dec[atm_idx], self.nside)
-                astro_map = event2map(astro_ra, astro_dec, self.nside)
+                atm_map = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
+
+                astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
+                astro_map = event2map(astro_ra[astro_mask], astro_dec[astro_mask], self.nside)
 
             else:
-                atm_map = event2map(atm_ra, atm_dec, self.nside)
+                atm_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north))
+                atm_map = event2map(atm_ra[atm_mask], atm_dec[atm_mask], self.nside)
                 astro_map = np.zeros(hp.nside2npix(self.nside))
 
-            data_maps.append(astro_map + atm_map)
+            data_maps[i] = astro_map + atm_map
 
-        data_maps = np.vstack(data_maps)
         return data_maps
 
 

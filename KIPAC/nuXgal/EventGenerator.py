@@ -52,7 +52,7 @@ class EventGenerator():
         assert (astroModel == 'observed_numu_fraction'), "EventGenerator: incorrect astroModel"
 
         # Fig 3 of 1908.09551
-        self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.]) * 2.
+        self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])# * 2.
         spectralIndex = 2.28
 
         aeff = ICECUBE_EXPOSURE_LIBRARY.get_exposure(self.year, spectralIndex)
@@ -149,30 +149,26 @@ class EventGenerator():
         counts_map : `np.ndarray`
             Maps of simulated events
         """
-        if np.array(f_diff).size == 1:
-            if f_diff == 0.:
-                Natm = np.random.poisson(self.nevts * N_yr)
-                self._atm_gen.nevents_expected.set_value(Natm, clear_parent=False)
-                countsmap = self._atm_gen.generate_event_maps(1)[0]
-                return countsmap
 
-            elif f_diff == 1:
-                f_diff = self.f_astro_north_truth
-
-            else:
-                raise ValueError('Scalar f_diff must be equal to 0 or 1')
-
+        if f_diff == 0.:
+            self.n_inj = 0
+            Natm = np.random.poisson(self.nevts * N_yr)
+            self._atm_gen.nevents_expected.set_value(Natm, clear_parent=False)
+            countsmap = self._atm_gen.generate_event_maps(1)[0]
+            return countsmap
 
         assert (self.astroModel == 'observed_numu_fraction'), "EventGenerator: incorrect astrophysical model"
         density_nu = density_nu.copy()
         density_nu[Defaults.idx_muon] = 0. # since we do not know the fraction of numu in southern sky
         density_nu = density_nu / density_nu.sum()
 
-        N_astro_north_obs = np.random.poisson(self.nevts * N_yr * f_diff)
+        Nastro = self.nevts * N_yr * self.f_astro_north_truth * f_diff
+        self.n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
+        N_astro_north_obs = np.random.poisson(Nastro)
         N_astro_north_exp = [N_astro_north_obs[i] / np.sum(self._astro_gen.prob_reject()[i] * density_nu) for i in range(Defaults.NEbin)]
         astro_map = self.astroEvent_galaxy(np.array(N_astro_north_exp), density_nu)
 
-        Natm = np.random.poisson(self.nevts * N_yr * (1-f_diff))
+        Natm = np.random.poisson(self.nevts * N_yr * (1-self.f_astro_north_truth*f_diff))
         self._atm_gen.nevents_expected.set_value(Natm, clear_parent=False)
         atm_map = self._atm_gen.generate_event_maps(1)[0]
 
