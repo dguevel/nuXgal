@@ -7,10 +7,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 from scipy import stats
 import emcee
+import csky as cy
 
 from KIPAC.nuXgal import Defaults
 from KIPAC.nuXgal.file_utils import read_maps_from_fits, write_maps_to_fits
 from KIPAC.nuXgal.EventGenerator import EventGenerator
+from KIPAC.nuXgal.CskyEventGenerator import CskyEventGenerator
 from KIPAC.nuXgal.Likelihood import Likelihood, significance
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal.Exposure import ICECUBE_EXPOSURE_LIBRARY
@@ -19,6 +21,7 @@ from KIPAC.nuXgal.GalaxySample import GALAXY_LIBRARY
 
 font = { 'family': 'Arial', 'weight' : 'normal', 'size'   : 21}
 legendfont = {'fontsize' : 21, 'frameon' : False}
+year_dict = dict(zip(['IC79-2010', 'IC86-2011', 'IC86-2012'], cy.selections.PSDataSpecs.ps_3yr))
 
 testfigpath = os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_')
 countsmappath = os.path.join(Defaults.NUXGAL_DATA_DIR, 'IceCube3yr_countsmap{i}.fits')
@@ -36,8 +39,12 @@ def CompareNeutrinoMaps(energyBin=2, plotcount=False, plotoverdensity=False, plo
 
     for year in ['IC79-2010', 'IC86-2011', 'IC86-2012']:
         print (year)
-        eg = EventGenerator(year, 'observed_numu_fraction')
-        counts = eg.SyntheticData(N_yr=1., f_diff=1., density_nu=gs.density)
+        eg = CskyEventGenerator(year_dict[year], version='version-002-p03')
+        counts = eg.SyntheticData(N_yr=1., f_diff=1.)
+
+        #eg = EventGenerator(year, 'observed_numu_fraction')
+        #counts = eg.SyntheticData(N_yr=1., f_diff=1., density_nu=gs.density)
+
         SyntheticData = NeutrinoSample()
         SyntheticData.inputCountsmap(counts)
         SyntheticData.updateMask(Defaults.idx_muon)
@@ -168,9 +175,9 @@ def GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True):
         plt.savefig(testfigpath+'GalaxySamplePowerSpectrum.pdf')
 
 
-def TS_distribution_calculate(plotN_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, N_re):
+def TS_distribution_calculate(plotN_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, N_re, use_csky):
 
-    llh = Likelihood(N_yr=plotN_yr,  galaxyName=galaxyName, computeSTD=computeSTD, Ebinmin=Ebinmin, Ebinmax=Ebinmax, lmin=lmin)
+    llh = Likelihood(N_yr=plotN_yr,  galaxyName=galaxyName, computeSTD=computeSTD, Ebinmin=Ebinmin, Ebinmax=Ebinmax, lmin=lmin, use_csky=use_csky)
     llh.TS_distribution(N_re, f_diff=0)
     llh.TS_distribution(N_re, f_diff=1,  astroModel='observed_numu_fraction')
 
@@ -215,7 +222,8 @@ def TS_distributionPlot(galaxyName, lmin,  pdf=False, N_re=10000):
     plt.step(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1_3yr)), lw=4, color=colors_astro[0],  where='post')
 
 
-    plt.fill_between(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1)), 1 - np.cumsum(TS2p(TS_astro2)), step='post', alpha=0.4, color=colors_astro[1])
+    #plt.fill_between(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1)), 1 - np.cumsum(TS2p(TS_astro2)), step='post', alpha=0.4, color=colors_astro[1])
+    plt.step(TS_bins[:-1],  1 - np.cumsum(TS2p(TS_astro1)), lw=3, color=colors_astro[1], where='post')
     print (np.median (np.sort(TS_astro2)))
 
     plt.plot([-10, 100], [0.5, 0.5], 'r--', lw=1)
@@ -260,9 +268,10 @@ def Projected10yr(readdata=True, plotMCMC=False):
         eg_2011 = EventGenerator('IC86-2011',   astroModel='observed_numu_fraction')
         eg_2012 = EventGenerator('IC86-2012',   astroModel='observed_numu_fraction')
 
-        countsmap = eg_2010.SyntheticData(1., f_diff=1, density_nu=gs_WISE.density) +\
-        eg_2011.SyntheticData(4.5, f_diff=1, density_nu=gs_WISE.density) +\
-        eg_2012.SyntheticData(4.5, f_diff=1, density_nu=gs_WISE.density)
+        f_diff = Defaults.f_astro_north_truth
+        countsmap = eg_2010.SyntheticData(1., f_diff=f_diff) +\
+        eg_2011.SyntheticData(4.5, f_diff=f_diff) +\
+        eg_2012.SyntheticData(4.5, f_diff=f_diff)
         ns.inputCountsmap(countsmap)
         write_maps_to_fits(countsmap, astropath)
 
@@ -276,10 +285,10 @@ def SED_3yr(plotMCMC=False):
 
 
 if __name__ == '__main__':
-    CompareNeutrinoMaps(energyBin=2, plotcount=True, plotoverdensity=True, plotpowerspectrum=True, plotcostheta=True)
-    GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True)
-    #TS_distribution_calculate(3, galaxyName='WISE', computeSTD=computeSTD, Ebinmin=1, Ebinmax=4, lmin=lmin, N_re = N_re)
-    #TS_distribution_calculate(10, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 200)
-    #TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
+    #CompareNeutrinoMaps(energyBin=2, plotcount=True, plotoverdensity=True, plotpowerspectrum=True, plotcostheta=True)
+    #GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True)
+    #TS_distribution_calculate(3, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 500, use_csky=True)
+    #TS_distribution_calculate(10, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 10000, use_csky=True)
+    TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
     #SED_3yr(plotMCMC=False)
     #Projected10yr(readdata=True, plotMCMC=False)

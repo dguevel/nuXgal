@@ -17,13 +17,11 @@ class CskyEventGenerator():
 
     This can generate both atmospheric and astrophysical events
     """
-    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03', Ebinmin=0, Ebinmax=7):
+    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03'):
         """C'tor
         """
 
         self.year = year
-        self.Ebinmin = Ebinmin
-        self.Ebinmax = Ebinmax
 
         self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])# * 2.
 
