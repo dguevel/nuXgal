@@ -7,7 +7,6 @@ import emcee
 import corner
 import csky as cy
 
-from tqdm import tqdm
 import multiprocessing as mp
 
 import matplotlib.pyplot as plt
@@ -329,19 +328,7 @@ class Likelihood():
         """
 
         if eg_list is None:
-            if self.use_csky:
-                if self.N_yr == 3:
-                    eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-                elif self.N_yr == 10:
-                    eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
-                else:
-                    raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
-
-            else:
-                eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
-                eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
-                eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
-                eg_list = [eg_2010, eg_2011, eg_2012]
+            eg_list = self._eg_list()
 
         if mp_cpus == 1:
             TS_array = self._TS(N_re, f_diff, eg_list)
@@ -372,6 +359,92 @@ class Likelihood():
         else:
             return TS_array
 
+    def upperLimit(self, N_re):
+        """Generate synthetic data sets and calculate median upper limit.
+
+        Parameters
+        ----------
+        N_re : `int`
+            Number of trials
+
+        Returns
+        -------
+        upper_limit : `np.array`
+            Upper limit flux
+        """
+
+        eg_list = self._eg_list()
+        upper_limit_flux = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+
+        for i in range(N_re):
+            if self.use_csky:
+                datamap = sum([eg.SyntheticData(1., f_diff=0) for eg in eg_list])
+            else:
+                datamap = sum([eg.SyntheticData(1., f_diff=0, density_ny=gs_WISE.density) for eg in eg_list])
+        
+            ns = NeutrinoSample()
+            ns.inputCountsmap(datamap)
+
+            self.inputData(ns)
+            ns.updateMask(self.idx_mask)
+            bestfit_f, TS = self.minimize__lnL()
+
+            f_Ebin = np.linspace(0, 4, 1000)
+
+                #eg.trial_runner.to_E2dNdE(self.Ncount[idx_E] * 
+
+                
+            exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86_II', 2.28)
+
+            for idx_E in range(llh.Ebinmin, llh.Ebinmax):
+
+                idx_bestfit_f = idx_E - llh.Ebinmin
+                lnl_max = llh.log_likelihood_Ebin(bestfit_f[idx_bestfit_f], idx_E)
+                lnL_Ebin = np.zeros_like(f_Ebin)
+                for idx_f, f in enumerate(f_Ebin):
+                    lnL_Ebin[idx_f] = llh.log_likelihood_Ebin(f, idx_E)
+
+                castro = LnLFn(f_Ebin, -lnL_Ebin)
+
+                f_hi = castro.getLimit(0.1)
+
+                if self.use_csky:
+                    if self.N_yr == 3:
+                        eg = CskyEventGenerator(cy.selections.PSDataSpecs.PS_3yr, version='version-002-p03')
+                    else:
+                        eg = CskyEventGenerator(cy.selections.PSDataSpecs.PS_10yr, version='version-003-p03')
+                    flux_hi = eg.trial_runner.to_E2dNdE(self.Ncount[idx_E] * f_hi)
+                else:
+                    # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
+                    exposuremap_E = exposuremap[idx_E].copy()
+                    exposuremap_E[llh.idx_mask] = hp.UNSEEN
+                    exposuremap_E = hp.ma(exposuremap_E)
+                    factor_f2flux = self.Ncount[idx_E] / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
+                                    llh.N_yr * 4 * np.pi * llh.f_sky * Defaults.map_dlogE *
+                                    np.log(10.)) * Defaults.map_E_center[idx_E]
+
+                    flux_hi = f_hi * factor_f2flux
+                upper_limit[i, idx_bestfit_f] = flux_hi
+
+        return upper_limit
+
+def _eg_list(self):
+        if self.use_csky:
+            if self.N_yr == 3:
+                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+            elif self.N_yr == 10:
+                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+            else:
+                raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
+
+        else:
+            eg_2010 = EventGenerator('IC79-2010', astroModel='observed_numu_fraction')
+            eg_2011 = EventGenerator('IC86-2011', astroModel='observed_numu_fraction')
+            eg_2012 = EventGenerator('IC86-2012', astroModel='observed_numu_fraction')
+            eg_list = [eg_2010, eg_2011, eg_2012]
+
+        return eg_list
+
 
     def sensitivitySamples(self, N_re, mp_cpus=1, writeData=True):
         """Generate a Test Statistic distribution for simulated trials
@@ -393,21 +466,10 @@ class Likelihood():
 
         result = []
 
-        if self.use_csky:
-            if self.N_yr == 3:
-                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-            elif self.N_yr == 10:
-                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
-            else:
-                raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
+        eg_list = self._eg_list()
 
-        else:
-            eg_2010 = EventGenerator('IC79-2010', astroModel='observed_numu_fraction')
-            eg_2011 = EventGenerator('IC86-2011', astroModel='observed_numu_fraction')
-            eg_2012 = EventGenerator('IC86-2012', astroModel='observed_numu_fraction')
-            eg_list = [eg_2010, eg_2011, eg_2012]
-
-        for f_diff in tqdm(np.linspace(0, 5, 10)):
+        #for f_diff in tqdm(np.linspace(0, 5, 10)):
+        for f_diff in np.linspace(0, 5, 10):
             TS_array, n_inj = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=True, mp_cpus=mp_cpus, eg_list=eg_list)
 
             result.append({'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy(), 'N_re': N_re})
