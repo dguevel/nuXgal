@@ -6,7 +6,6 @@ import argparse
 import numpy as np
 
 from KIPAC.nuXgal.Likelihood import Likelihood
-from KIPAC.nuXgal.Defaults import SYNTHETIC_TS_SIGNAL_FORMAT
 
 def main():
     parser = argparse.ArgumentParser()
@@ -19,13 +18,20 @@ def main():
     args = parser.parse_args()
     
     llh = Likelihood(args.N_yr, 'WISE', computeSTD=False, Ebinmin=args.emin, Ebinmax=args.emax, lmin=50, use_csky=args.use_csky)
-    upper_lim = llh.upperLimit(args.N_re)
+    flux, f_astro, N_astro = llh.upperLimit(args.N_re)
 
-    ULpath = os.path.join(args.output, 'UL_null.txt')
+    flux_path = os.path.join(args.output, 'UL_flux.txt')
+    f_astro_path = os.path.join(args.output, 'UL_f_astro.txt')
+    N_astro_path = os.path.join(args.output, 'UL_N_astro.txt')
 
-    with open(TSpath, 'wb') as f:
-        np.savetxt(f, upper_lim)
+    with open(flux_path, 'wb') as f:
+        np.savetxt(f, flux)
 
+    with open(f_astro_path, 'wb') as f:
+        np.savetxt(f, f_astro)
+
+    with open(N_astro_path, 'wb') as f:
+        np.savetxt(f, N_astro)
 
 if __name__ == '__main__':
     main()

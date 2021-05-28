@@ -35,14 +35,12 @@ class CskyEventGenerator():
         galaxy_map /= galaxy_map.sum()
         self.nside = hp.npix2nside(galaxy_map.size)
 
-
-        # the flux in each bin is not the correct units, but its ok because
-        # we're injecting a fixed number of events and not using csky to
-        # fit the llh
-
+        n = sum([k.n_bg_data for k in ana])
+            
         conf = {
             'template': galaxy_map,
-            'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.f_astro_north_truth),
+            'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, n * self.f_astro_north_truth),
+            #'flux': cy.hyp.PowerLawFlux(gamma=2.28),
             'sigsub': True,
             'fast_weight': True,
             'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
@@ -53,11 +51,13 @@ class CskyEventGenerator():
 
         self.nevts = []
 
-        trial, _ = self.trial_runner.get_one_trial(0)
         for emin, emax in zip(Defaults.map_E_edge, Defaults.map_E_edge[1:]):
             # calculate number of events in the northern sky
-            idx_mask = (trial[0][0]['log10energy'] > np.log10(emin)) & (trial[0][0]['log10energy'] < np.log10(emax)) & (trial[0][0]['dec'] > np.cos(Defaults.theta_north))
-            self.nevts.append(np.sum(idx_mask))
+            nevt = 0
+            for k in ana:
+                idx_mask = (k.bg_data['log10energy'] > np.log10(emin)) & (k.bg_data['log10energy'] < np.log10(emax))# & (k.bg_data  > (np.pi/2 - np.cos(Defaults.theta_north)))
+                nevt += idx_mask.sum()
+            self.nevts.append(nevt)
 
         self.nevts = np.array(self.nevts)
         ana.save(ana_dir)

@@ -375,12 +375,25 @@ class Likelihood():
 
         eg_list = self._eg_list()
         upper_limit_flux = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        upper_limit_f_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        upper_limit_N_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+
+        if self.use_csky:
+            trial_runner = {}
+            flux = {}
+            for idx_E in range(self.Ebinmin, self.Ebinmax):
+                conf = eg_list[0].conf.copy()
+                erange = Defaults.map_E_edge[idx_E: idx_E + 2]
+                flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
+                conf['flux'] = flux_model
+                flux[idx_E] = flux_model
+                trial_runner[idx_E] = cy.get_trial_runner(conf)
 
         for i in range(N_re):
             if self.use_csky:
                 datamap = sum([eg.SyntheticData(1., f_diff=0) for eg in eg_list])
             else:
-                datamap = sum([eg.SyntheticData(1., f_diff=0, density_ny=gs_WISE.density) for eg in eg_list])
+                datamap = sum([eg.SyntheticData(1., f_diff=0, density_nu=self.gs.density) for eg in eg_list])
         
             ns = NeutrinoSample()
             ns.inputCountsmap(datamap)
@@ -394,46 +407,50 @@ class Likelihood():
                 #eg.trial_runner.to_E2dNdE(self.Ncount[idx_E] * 
 
                 
-            exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86_II', 2.28)
+            exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
 
-            for idx_E in range(llh.Ebinmin, llh.Ebinmax):
+            for idx_E in range(self.Ebinmin, self.Ebinmax):
 
-                idx_bestfit_f = idx_E - llh.Ebinmin
-                lnl_max = llh.log_likelihood_Ebin(bestfit_f[idx_bestfit_f], idx_E)
+                idx_bestfit_f = idx_E - self.Ebinmin
+                lnl_max = self.log_likelihood_Ebin(bestfit_f[idx_bestfit_f], idx_E)
                 lnL_Ebin = np.zeros_like(f_Ebin)
                 for idx_f, f in enumerate(f_Ebin):
-                    lnL_Ebin[idx_f] = llh.log_likelihood_Ebin(f, idx_E)
+                    lnL_Ebin[idx_f] = self.log_likelihood_Ebin(f, idx_E)
 
                 castro = LnLFn(f_Ebin, -lnL_Ebin)
 
-                f_hi = castro.getLimit(0.1)
+                #f_hi = castro.getLimit(0.1)
+                f_hi = castro.getLimit(0.05)
 
                 if self.use_csky:
-                    if self.N_yr == 3:
-                        eg = CskyEventGenerator(cy.selections.PSDataSpecs.PS_3yr, version='version-002-p03')
-                    else:
-                        eg = CskyEventGenerator(cy.selections.PSDataSpecs.PS_10yr, version='version-003-p03')
-                    flux_hi = eg.trial_runner.to_E2dNdE(self.Ncount[idx_E] * f_hi)
+
+                    acceptance = trial_runner[idx_E].sig_inj_acc_total
+                    factor_f2flux = self.Ncount[idx_E] / acceptance * flux[idx_E](Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
                 else:
                     # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
                     exposuremap_E = exposuremap[idx_E].copy()
-                    exposuremap_E[llh.idx_mask] = hp.UNSEEN
+                    exposuremap_E[self.idx_mask] = hp.UNSEEN
                     exposuremap_E = hp.ma(exposuremap_E)
                     factor_f2flux = self.Ncount[idx_E] / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
-                                    llh.N_yr * 4 * np.pi * llh.f_sky * Defaults.map_dlogE *
+                                    self.N_yr * 4 * np.pi * self.f_sky * Defaults.map_dlogE *
                                     np.log(10.)) * Defaults.map_E_center[idx_E]
 
-                    flux_hi = f_hi * factor_f2flux
-                upper_limit[i, idx_bestfit_f] = flux_hi
+                flux_hi = f_hi * factor_f2flux
+                #print(self.Ncount[idx_E], f_hi)
+                upper_limit_flux[i, idx_bestfit_f] = flux_hi
+                upper_limit_f_astro[i, idx_bestfit_f] = f_hi
+                upper_limit_N_astro[i, idx_bestfit_f] = f_hi * self.Ncount[idx_E]
 
-        return upper_limit
+        return upper_limit_flux, upper_limit_f_astro, upper_limit_N_astro
 
-def _eg_list(self):
+    def _eg_list(self):
         if self.use_csky:
             if self.N_yr == 3:
-                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
             elif self.N_yr == 10:
-                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
             else:
                 raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
 
