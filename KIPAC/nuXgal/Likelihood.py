@@ -277,6 +277,22 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
 
+    def get_many_fits(self, N_re, f_diff):
+        # TODO: multiprocessing
+        TS = np.zeros(N_re)
+        f_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        eg_list = self._eg_list()
+        for i in range(N_re):
+            if self.use_csky:
+                datamap = sum([eg.SyntheticData(1., f_diff=f_diff) for eg in eg_list])
+            else:
+                datamap = sum([eg.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) for eg in eg_list])
+            ns = NeutrinoSample()
+            ns.inputCountsmap(datamap)
+            self.inputData(ns)
+            f_astro[i], TS[i] = self.minimize__lnL()
+        return f_astro, TS
+
     def _TS(self, N_re, f_diff, eg_list, queue=None):
         TS_array = np.zeros(N_re)
         for i in np.arange(N_re):
@@ -302,8 +318,13 @@ class Likelihood():
         else:
             queue.put(TS_array)
 
+    def f_astro_to_n_astro(self, f_astro):
+        eg_list = self._eg_list()
+        n_astro = np.sum([eg.nevts * f_astro for eg in eg_list], axis=1)
+        return n_astro
+            
 
-    def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True, return_n_inj=False, mp_cpus=1, eg_list=None):
+    def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True, return_n_inj=False, mp_cpus=1):
         """Generate a Test Statistic distribution for simulated trials
 
         Parameters
@@ -327,8 +348,7 @@ class Likelihood():
             The array of TS values
         """
 
-        if eg_list is None:
-            eg_list = self._eg_list()
+        eg_list = self._eg_list()
 
         if mp_cpus == 1:
             TS_array = self._TS(N_re, f_diff, eg_list)
@@ -358,6 +378,7 @@ class Likelihood():
             return TS_array, n_inj
         else:
             return TS_array
+
 
     def upperLimit(self, N_re):
         """Generate synthetic data sets and calculate median upper limit.
@@ -444,21 +465,25 @@ class Likelihood():
         return upper_limit_flux, upper_limit_f_astro, upper_limit_N_astro
 
     def _eg_list(self):
-        if self.use_csky:
-            if self.N_yr == 3:
-                #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-                eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
-            elif self.N_yr == 10:
-                #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
-                eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
-            else:
-                raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
+        try:
+            return self.eg_list
+        except AttributeError:
+            if self.use_csky:
+                if self.N_yr == 3:
+                    #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
+                elif self.N_yr == 10:
+                    #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
+                else:
+                    raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
 
-        else:
-            eg_2010 = EventGenerator('IC79-2010', astroModel='observed_numu_fraction')
-            eg_2011 = EventGenerator('IC86-2011', astroModel='observed_numu_fraction')
-            eg_2012 = EventGenerator('IC86-2012', astroModel='observed_numu_fraction')
-            eg_list = [eg_2010, eg_2011, eg_2012]
+            else:
+                eg_2010 = EventGenerator('IC79-2010', astroModel='observed_numu_fraction')
+                eg_2011 = EventGenerator('IC86-2011', astroModel='observed_numu_fraction')
+                eg_2012 = EventGenerator('IC86-2012', astroModel='observed_numu_fraction')
+                eg_list = [eg_2010, eg_2011, eg_2012]
+            self.eg_list = eg_list
 
         return eg_list
 
@@ -487,7 +512,7 @@ class Likelihood():
 
         #for f_diff in tqdm(np.linspace(0, 5, 10)):
         for f_diff in np.linspace(0, 5, 10):
-            TS_array, n_inj = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=True, mp_cpus=mp_cpus, eg_list=eg_list)
+            TS_array, n_inj = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=True, mp_cpus=mp_cpus)
 
             result.append({'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy(), 'N_re': N_re})
 
