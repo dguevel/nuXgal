@@ -63,6 +63,7 @@ CORNER_PLOT_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'corner_{galaxyName}
 randomseed_galaxy = 42                                             # Seed used to produce random galaxy sample
 THREE_YEAR_NAMES = ['IC79-2010', 'IC86-2011', 'IC86-2012']         # Keys for 3 year data sample
 STANDARD_SPECTRAL_INDICES = [3.7, 2.28, 2.89]                      # Indices to use for weighted effective area and exposure maps
+f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])
 
 
 # Derived quantities for analyzing the Neutrino sample and cross-correlation
