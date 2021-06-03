@@ -9,7 +9,7 @@ from KIPAC.nuXgal.Likelihood import Likelihood
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('f_astro', help='Factor multiplied by fraction of diffuse flux to inject as signal', type=int)
+    parser.add_argument('f_astro', help='Factor multiplied by fraction of diffuse flux to inject as signal', type=float)
     parser.add_argument('N_yr', help='Number of years of synthetic data, choose 3 or 10', type=int)
     parser.add_argument('N_re', help='Number of trials', type=int)
     parser.add_argument('-o', '--output', help='Directory for output files', default=os.path.join('data', 'user', 'dguevel', 'TS'), type=str)
@@ -19,7 +19,7 @@ def main():
     args = parser.parse_args()
     
     llh = Likelihood(args.N_yr, 'WISE', computeSTD=False, Ebinmin=args.emin, Ebinmax=args.emax, lmin=50, use_csky=args.use_csky)
-    TS, n_inj = llh.TS_dist(args.N_re, args.f_astro, writeData=False, return_n_inj=True)
+    TS, n_inj = llh.TS_distribution(args.N_re, args.f_astro, writeData=False, return_n_inj=True)
 
     TS_path = os.path.join(args.output, 'TS_{f_astro}_{n_yr}yr.txt'.format(f_astro=args.f_astro, n_yr=args.N_yr))
 
