@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import emcee
 import csky as cy
+import corner
 
 from KIPAC.nuXgal import Defaults
 from KIPAC.nuXgal.file_utils import read_maps_from_fits, write_maps_to_fits
@@ -277,6 +278,22 @@ def Projected10yr(readdata=True, plotMCMC=False):
 
     BestfitModel(ns=ns, N_yr=N_yr, galaxyName='WISE', lmin=50, Ebinmin=1, Ebinmax=4, plotMCMC=plotMCMC, plotSED=True)
 
+def SensitivityPlot():
+    #fig, axes = plt.subplots(3, 1, figsize=(8,6))
+    #axes = axes.flatten()
+
+    upper_limits = np.loadtxt('/Users/dguevel/git/nuXgal/syntheticData/upper_limits/UL_f_astro_10yr.txt')
+    print(np.median(upper_limits, axis=0))
+
+    fig = corner.corner(
+            upper_limits,
+            truths=np.median(upper_limits, axis=0),
+            labels=['f_astro_{0}'.format(str(i)) for i in range(upper_limits.shape[1])],
+        )
+
+    plt.show()
+
+
 
 def SED_3yr(plotMCMC=False):
     ns = IC3yr
@@ -289,6 +306,7 @@ if __name__ == '__main__':
     #GalaxySampleCharacters(plotWISEmap=True, plotpowerspectrum=True)
     #TS_distribution_calculate(3, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 500, use_csky=True)
     #TS_distribution_calculate(10, galaxyName='WISE', computeSTD=False, Ebinmin=1, Ebinmax=4, lmin=50, N_re = 10000, use_csky=True)
-    TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
+    #TS_distributionPlot(galaxyName='WISE', lmin=50, pdf=False)
     #SED_3yr(plotMCMC=False)
     #Projected10yr(readdata=True, plotMCMC=False)
+    SensitivityPlot()
