@@ -398,6 +398,7 @@ class Likelihood():
         upper_limit_flux = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
         upper_limit_f_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
         upper_limit_N_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        TS = np.zeros(N_re)
 
         if self.use_csky:
             trial_runner = {}
@@ -421,13 +422,10 @@ class Likelihood():
 
             self.inputData(ns)
             ns.updateMask(self.idx_mask)
-            bestfit_f, TS = self.minimize__lnL()
+            bestfit_f, TS[i] = self.minimize__lnL()
 
             f_Ebin = np.linspace(0, 4, 1000)
 
-                #eg.trial_runner.to_E2dNdE(self.Ncount[idx_E] * 
-
-                
             exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
 
             for idx_E in range(self.Ebinmin, self.Ebinmax):
@@ -462,7 +460,7 @@ class Likelihood():
                 upper_limit_f_astro[i, idx_bestfit_f] = f_hi
                 upper_limit_N_astro[i, idx_bestfit_f] = f_hi * self.Ncount[idx_E]
 
-        return upper_limit_flux, upper_limit_f_astro, upper_limit_N_astro
+        return {'flux': upper_limit_flux, 'f_astro': upper_limit_f_astro, 'n_astro': upper_limit_N_astro, 'TS': TS}
 
     def _eg_list(self):
         try:
