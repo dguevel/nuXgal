@@ -379,6 +379,31 @@ class Likelihood():
         else:
             return TS_array
 
+    def factor_f2flux(self):
+        f2flux = {}
+        eg_list = self._eg_list()
+
+        for idx_E in range(self.Ebinmin, self.Ebinmax):
+            if self.use_csky:
+                for idx_E in range(self.Ebinmin, self.Ebinmax):
+                    conf = eg_list[0].conf.copy()
+                    erange = Defaults.map_E_edge[idx_E: idx_E + 2]
+                    flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
+                    conf['flux'] = flux_model
+                    flux = flux_model
+                    trial_runner = cy.get_trial_runner(conf)
+
+                acceptance = trial_runner.sig_inj_acc_total
+                f2flux[idx_E] = self.Ncount[idx_E] / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
+            else:
+                # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
+                exposuremap_E = exposuremap[idx_E].copy()
+                exposuremap_E[self.idx_mask] = hp.UNSEEN
+                exposuremap_E = hp.ma(exposuremap_E)
+                f2flux[idx_E] = self.Ncount[idx_E] / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
+                                self.N_yr * 4 * np.pi * self.f_sky * Defaults.map_dlogE *
+                                np.log(10.)) * Defaults.map_E_center[idx_E]
+        return f2flux
 
     def upperLimit(self, N_re):
         """Generate synthetic data sets and calculate median upper limit.
@@ -400,16 +425,7 @@ class Likelihood():
         upper_limit_N_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
         TS = np.zeros(N_re)
 
-        if self.use_csky:
-            trial_runner = {}
-            flux = {}
-            for idx_E in range(self.Ebinmin, self.Ebinmax):
-                conf = eg_list[0].conf.copy()
-                erange = Defaults.map_E_edge[idx_E: idx_E + 2]
-                flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
-                conf['flux'] = flux_model
-                flux[idx_E] = flux_model
-                trial_runner[idx_E] = cy.get_trial_runner(conf)
+        factor_f2flux = self.factor_f2flux()
 
         for i in range(N_re):
             if self.use_csky:
@@ -438,23 +454,10 @@ class Likelihood():
 
                 castro = LnLFn(f_Ebin, -lnL_Ebin)
 
-                #f_hi = castro.getLimit(0.1)
-                f_hi = castro.getLimit(0.05)
+                f_hi = castro.getLimit(0.1)
+                #f_hi = castro.getLimit(0.05)
 
-                if self.use_csky:
-
-                    acceptance = trial_runner[idx_E].sig_inj_acc_total
-                    factor_f2flux = self.Ncount[idx_E] / acceptance * flux[idx_E](Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
-                else:
-                    # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
-                    exposuremap_E = exposuremap[idx_E].copy()
-                    exposuremap_E[self.idx_mask] = hp.UNSEEN
-                    exposuremap_E = hp.ma(exposuremap_E)
-                    factor_f2flux = self.Ncount[idx_E] / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
-                                    self.N_yr * 4 * np.pi * self.f_sky * Defaults.map_dlogE *
-                                    np.log(10.)) * Defaults.map_E_center[idx_E]
-
-                flux_hi = f_hi * factor_f2flux
+                flux_hi = f_hi * factor_f2flux[idx_E]
                 #print(self.Ncount[idx_E], f_hi)
                 upper_limit_flux[i, idx_bestfit_f] = flux_hi
                 upper_limit_f_astro[i, idx_bestfit_f] = f_hi
@@ -486,7 +489,7 @@ class Likelihood():
         return eg_list
 
 
-    def sensitivitySamples(self, N_re, mp_cpus=1, writeData=True):
+    def sensitivitySamples(self, N_re, N_inj, mp_cpus=1, writeData=True):
         """Generate a Test Statistic distribution for simulated trials
 
         Parameters
@@ -504,15 +507,10 @@ class Likelihood():
             List of dicts with TS samples and n injected.
         """
 
-        result = []
+        f_diff = n_inj * Defaults.f_astro_north_truth
 
-        eg_list = self._eg_list()
-
-        #for f_diff in tqdm(np.linspace(0, 5, 10)):
-        for f_diff in np.linspace(0, 5, 10):
-            TS_array, n_inj = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=True, mp_cpus=mp_cpus)
-
-            result.append({'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy(), 'N_re': N_re})
+        TS_array = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=False, mp_cpus=mp_cpus)
+        result.append({'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy(), 'N_re': N_re})
 
         return result 
 
