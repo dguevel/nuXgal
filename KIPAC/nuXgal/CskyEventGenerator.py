@@ -35,21 +35,8 @@ class CskyEventGenerator():
         galaxy_map = hp.read_map(Defaults.GALAXYMAP_FORMAT.format(galaxyName='WISE'))
         galaxy_map[Defaults.idx_muon] = 0.
         galaxy_map /= galaxy_map.sum()
+        self.galaxy_map = galaxy_map.copy()
         self.nside = hp.npix2nside(galaxy_map.size)
-
-        n = sum([k.n_bg_data for k in ana])
-            
-        conf = {
-            'template': galaxy_map,
-            #'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, n * self.f_astro_north_truth),
-            'flux': cy.hyp.PowerLawFlux(gamma=2.28),
-            'sigsub': True,
-            'fast_weight': True,
-            'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
-        }
-
-        self.conf = conf
-        self.trial_runner = cy.get_trial_runner(self.conf)
 
         self.nevts = []
 
@@ -62,7 +49,37 @@ class CskyEventGenerator():
             self.nevts.append(nevt)
 
         self.nevts = np.array(self.nevts)
+
+        conf = {
+            'template': self.galaxy_map,
+            'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.nevts * self.f_astro_north_truth / np.diff(Defaults.map_E_edge)),
+            #'flux': cy.hyp.PowerLawFlux(gamma=2.28),
+            'sigsub': True,
+            'fast_weight': True,
+            'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
+        }
+
+        self.conf = conf
+        self.trial_runner = cy.get_trial_runner(self.conf)
+
         ana.save(ana_dir)
+
+        self._prob_reject()
+
+    def _prob_reject(self):
+        npix = hp.nside2npix(self.nside)
+        acceptance = np.zeros((Defaults.NEbin, npix))
+        subana = self.ana[0]
+        class dec: dec = np.pi/2 - hp.pix2ang(self.nside, np.arange(npix))[0]
+        for i, (emin, emax) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
+            sig = subana.sig[(subana.sig['log10energy'] > emin) & (subana.sig['log10energy'] < emax)]
+            if len(sig) == 0:
+                acceptance[i] = np.ones(npix)
+            else:
+                acc_model = cy.pdf.SinDecAccParameterization(sig)
+                acceptance[i] = acc_model(dec, gamma=2.28)
+                acceptance[i] /= acceptance[i].max()
+        self.prob_reject = acceptance
 
     def SyntheticData(self, N_yr, f_diff):
         """Generate Synthetic Data
@@ -82,12 +99,14 @@ class CskyEventGenerator():
         """
 
         if np.array(f_diff).size == 1:
-            n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff * len(self.ana)
+            #n_inj = (self.nevts * self.f_astro_north_truth / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * f_diff
+            n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
+            #print(n_inj)
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
 
         elif np.array(f_diff).size == self.f_astro_north_truth.size:
-            n_inj = (self.nevts * f_diff).sum() * N_yr * len(self.ana)
+            n_inj = (self.nevts * f_diff / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * len(self.ana)
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
 
@@ -133,9 +152,7 @@ class CskyEventGenerator():
 
 
                 atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
-                #atm_map = event2map(atm_ra[atm_mask][:n_atm], atm_dec[atm_mask][:n_atm], self.nside)
 
-                astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
                 astro_maps[i] = event2map(astro_ra[astro_mask], astro_dec[astro_mask], self.nside)
 
             else:

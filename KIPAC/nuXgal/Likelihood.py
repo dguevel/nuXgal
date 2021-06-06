@@ -363,7 +363,7 @@ class Likelihood():
             TS_array = np.hstack([queue.get() for proc in procs])
             [proc.join() for proc in procs]
 
-        n_inj = np.sum([(eg.nevts * eg.f_astro_north_truth).sum() * f_diff for eg in eg_list])
+        n_inj = np.sum([(eg.nevts * eg.f_astro_north_truth * f_diff).sum() for eg in eg_list])
 
         if writeData:
             if f_diff == 0:
@@ -471,11 +471,11 @@ class Likelihood():
         except AttributeError:
             if self.use_csky:
                 if self.N_yr == 3:
-                    #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
+                    eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                    #eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
                 elif self.N_yr == 10:
-                    #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
-                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
+                    eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                    #eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
                 else:
                     raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
 
@@ -489,7 +489,7 @@ class Likelihood():
         return eg_list
 
 
-    def sensitivitySamples(self, N_re, N_inj, mp_cpus=1, writeData=True):
+    def sensitivitySamples(self, N_re, f_diff, mp_cpus=1, writeData=True):
         """Generate a Test Statistic distribution for simulated trials
 
         Parameters
@@ -507,10 +507,8 @@ class Likelihood():
             List of dicts with TS samples and n injected.
         """
 
-        f_diff = n_inj * Defaults.f_astro_north_truth
-
-        TS_array = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=False, mp_cpus=mp_cpus)
-        result.append({'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy(), 'N_re': N_re})
+        TS_array, n_inj = self.TS_distribution(N_re, f_diff, writeData=writeData, return_n_inj=True, mp_cpus=mp_cpus)
+        result = {'n_inj': n_inj, 'f_astro': f_diff, 'TS': TS_array.copy()}
 
         return result 
 
