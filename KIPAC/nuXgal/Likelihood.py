@@ -380,30 +380,30 @@ class Likelihood():
             return TS_array
 
     def factor_f2flux(self):
-        f2flux = {}
+        f2flux = np.zeros((self.Ebinmax - self.Ebinmin))
         eg_list = self._eg_list()
 
-        for idx_E in range(self.Ebinmin, self.Ebinmax):
+        for i, idx_E in enumerate(range(self.Ebinmin, self.Ebinmax)):
             if self.use_csky:
-                for idx_E in range(self.Ebinmin, self.Ebinmax):
-                    conf = eg_list[0].conf.copy()
-                    erange = Defaults.map_E_edge[idx_E: idx_E + 2]
-                    flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
-                    conf['flux'] = flux_model
-                    flux = flux_model
-                    trial_runner = cy.get_trial_runner(conf)
+                conf = eg_list[0].conf.copy()
+                erange = Defaults.map_E_edge[idx_E: idx_E + 2]
+                flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
+                conf['flux'] = flux_model
+                flux = flux_model
+                trial_runner = cy.get_trial_runner(conf)
 
                 acceptance = trial_runner.sig_inj_acc_total
-                f2flux[idx_E] = self.Ncount[idx_E] / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
+                print(self.Ncount, flux(Defaults.map_E_center[idx_E]), Defaults.map_E_center[idx_E]) 
+                f2flux[i] = 1 / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
             else:
                 # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
                 exposuremap_E = exposuremap[idx_E].copy()
                 exposuremap_E[self.idx_mask] = hp.UNSEEN
                 exposuremap_E = hp.ma(exposuremap_E)
-                f2flux[idx_E] = self.Ncount[idx_E] / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
+                f2flux[i] = 1 / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
                                 self.N_yr * 4 * np.pi * self.f_sky * Defaults.map_dlogE *
                                 np.log(10.)) * Defaults.map_E_center[idx_E]
-        return f2flux
+        return np.array(f2flux)
 
     def upperLimit(self, N_re):
         """Generate synthetic data sets and calculate median upper limit.
@@ -457,8 +457,7 @@ class Likelihood():
                 f_hi = castro.getLimit(0.1)
                 #f_hi = castro.getLimit(0.05)
 
-                flux_hi = f_hi * factor_f2flux[idx_E]
-                #print(self.Ncount[idx_E], f_hi)
+                flux_hi = f_hi * self.Ncount[idx_bestfit_f] * factor_f2flux[idx_bestfit_f]
                 upper_limit_flux[i, idx_bestfit_f] = flux_hi
                 upper_limit_f_astro[i, idx_bestfit_f] = f_hi
                 upper_limit_N_astro[i, idx_bestfit_f] = f_hi * self.Ncount[idx_E]
