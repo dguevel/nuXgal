@@ -396,6 +396,8 @@ class Likelihood():
                 print(self.Ncount, flux(Defaults.map_E_center[idx_E]), Defaults.map_E_center[idx_E]) 
                 f2flux[i] = 1 / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
             else:
+                exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
+
                 # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
                 exposuremap_E = exposuremap[idx_E].copy()
                 exposuremap_E[self.idx_mask] = hp.UNSEEN
@@ -441,8 +443,6 @@ class Likelihood():
             bestfit_f, TS[i] = self.minimize__lnL()
 
             f_Ebin = np.linspace(0, 4, 1000)
-
-            exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
 
             for idx_E in range(self.Ebinmin, self.Ebinmax):
 
