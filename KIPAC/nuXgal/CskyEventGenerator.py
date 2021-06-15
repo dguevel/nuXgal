@@ -101,12 +101,12 @@ class CskyEventGenerator():
         if np.array(f_diff).size == 1:
             #n_inj = (self.nevts * self.f_astro_north_truth / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * f_diff
             n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
-            #print(n_inj)
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
 
         elif np.array(f_diff).size == self.f_astro_north_truth.size:
-            n_inj = (self.nevts * f_diff / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * len(self.ana)
+            #n_inj = (self.nevts * f_diff / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * len(self.ana)
+            n_inj = (self.nevts * f_diff).sum() * N_yr
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
 
@@ -138,9 +138,10 @@ class CskyEventGenerator():
                 n_atm = atm_mask.sum() - astro_mask.sum()
                 if n_atm < 0:
                     n_atm = 0
-                included_events = np.random.choice(atm_idx[atm_mask], size=n_atm, replace=False)
+                #included_events = np.random.choice(atm_idx[atm_mask], size=n_atm, replace=False)
 
                 # TODO: add in declination selection
+                #astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
                 #included_events = []
                 #dec_bands = np.arange(-np.pi/2, np.pi/2 + 0.01, 0.2)
                 #for dmin, dmax in zip(dec_bands, dec_bands[1:]):
@@ -151,7 +152,9 @@ class CskyEventGenerator():
                 #        included_events.extend(np.random.choice(atm_idx[atm_band_mask], size=n_atm, replace=False))
 
 
-                atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
+                #atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
+                #atm_maps[i] = event2map(atm_ra[atm_mask], atm_dec[atm_mask], self.nside)
+                atm_maps[i] = event2map(atm_ra[:n_atm], atm_dec[:n_atm], self.nside)
 
                 astro_maps[i] = event2map(astro_ra[astro_mask], astro_dec[astro_mask], self.nside)
 
