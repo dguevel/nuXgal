@@ -52,8 +52,8 @@ class CskyEventGenerator():
 
         conf = {
             'template': self.galaxy_map,
-            'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.nevts * self.f_astro_north_truth / np.diff(Defaults.map_E_edge)),
-            #'flux': cy.hyp.PowerLawFlux(gamma=2.28),
+            #'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.nevts * self.f_astro_north_truth / np.diff(Defaults.map_E_edge)),
+            'flux': cy.hyp.PowerLawFlux(gamma=2.28),
             'sigsub': True,
             'fast_weight': True,
             'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
@@ -64,7 +64,7 @@ class CskyEventGenerator():
 
         ana.save(ana_dir)
 
-        self._prob_reject()
+        #self._prob_reject()
 
     def _prob_reject(self):
         npix = hp.nside2npix(self.nside)
@@ -103,12 +103,16 @@ class CskyEventGenerator():
             n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
+            n_atm = self.nevts * (1 - self.f_astro_north_truth * f_diff) * N_yr
+            n_atm = n_atm.astype(int)
 
         elif np.array(f_diff).size == self.f_astro_north_truth.size:
             #n_inj = (self.nevts * f_diff / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * len(self.ana)
             n_inj = (self.nevts * f_diff).sum() * N_yr
             self.n_inj = n_inj
             trial, _ = self.trial_runner.get_one_trial(n_inj)
+            n_atm = self.nevts * (1 - f_diff) * N_yr
+            n_atm = n_atm.astype(int)
 
         else:
             raise ValueError('Scalar f_diff or f_diff shape equal to f_astro_north_truth')
@@ -135,10 +139,10 @@ class CskyEventGenerator():
 
                 atm_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north)) 
                 astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
-                n_atm = atm_mask.sum() - astro_mask.sum()
-                if n_atm < 0:
-                    n_atm = 0
-                #included_events = np.random.choice(atm_idx[atm_mask], size=n_atm, replace=False)
+                #n_atm = atm_mask.sum() - astro_mask.sum()
+                #if n_atm < 0:
+                #    n_atm = 0
+                included_events = np.random.choice(atm_idx[atm_mask], size=n_atm[i], replace=False)
 
                 # TODO: add in declination selection
                 #astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
@@ -152,9 +156,10 @@ class CskyEventGenerator():
                 #        included_events.extend(np.random.choice(atm_idx[atm_band_mask], size=n_atm, replace=False))
 
 
-                #atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
+                atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
                 #atm_maps[i] = event2map(atm_ra[atm_mask], atm_dec[atm_mask], self.nside)
-                atm_maps[i] = event2map(atm_ra[:n_atm], atm_dec[:n_atm], self.nside)
+                #atm_maps[i] = event2map(atm_ra[atm_mask][:n_atm], atm_dec[atm_mask][:n_atm], self.nside)
+                #atm_maps[i] = event2map(atm_ra[atm_mask][:n_atm[i]], atm_dec[atm_mask][:n_atm[i]], self.nside)
 
                 astro_maps[i] = event2map(astro_ra[astro_mask], astro_dec[astro_mask], self.nside)
 

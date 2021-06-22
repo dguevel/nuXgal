@@ -277,21 +277,52 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
 
-    def get_many_fits(self, N_re, f_diff):
+    def get_many_fits(self, N_re, f_astro_in):
         # TODO: multiprocessing
+
+        factor_f2flux = self.factor_f2flux()
+
         TS = np.zeros(N_re)
-        f_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        f_astro_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        flux_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+        N_astro_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
+
         eg_list = self._eg_list()
+
         for i in range(N_re):
             if self.use_csky:
-                datamap = sum([eg.SyntheticData(1., f_diff=f_diff) for eg in eg_list])
+                datamap = sum([eg.SyntheticData(1., f_diff=f_astro_in) for eg in eg_list])
             else:
-                datamap = sum([eg.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) for eg in eg_list])
+                datamap = sum([eg.SyntheticData(1., f_diff=f_astro_in, density_nu=self.gs.density) for eg in eg_list])
             ns = NeutrinoSample()
             ns.inputCountsmap(datamap)
             self.inputData(ns)
-            f_astro[i], TS[i] = self.minimize__lnL()
-        return f_astro, TS
+
+            f_astro_fit[i], TS[i] = self.minimize__lnL()
+
+            f_Ebin = np.linspace(0, 4, 1000)
+            for idx_E in range(self.Ebinmin, self.Ebinmax):
+                idx_bestfit_f = idx_E - self.Ebinmin
+                lnl_max = self.log_likelihood_Ebin(f_astro_fit[i][idx_bestfit_f], idx_E)
+                lnL_Ebin = np.zeros_like(f_Ebin)
+                for idx_f, f in enumerate(f_Ebin):
+                    lnL_Ebin[idx_f] = self.log_likelihood_Ebin(f, idx_E)
+
+                castro = LnLFn(f_Ebin, -lnL_Ebin)
+                TS_Ebin = castro.TS()
+                # if this bin is significant, plot the 1 sigma interval
+                flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f] * factor_f2flux[idx_bestfit_f]
+
+        results = {
+                'f_astro_factor': f_astro_in,
+                'f_astro_inj': f_astro_in * Defaults.f_astro_north_truth[self.Ebinmin: self.Ebinmax],
+                'f_astro_fit': f_astro_fit,
+                'N_astro_inj': sum([(eg.nevts * f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
+                'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
+                'flux_fit': flux_fit,
+                'TS': TS,
+                }
+        return results
 
     def _TS(self, N_re, f_diff, eg_list, queue=None):
         TS_array = np.zeros(N_re)
@@ -318,11 +349,6 @@ class Likelihood():
         else:
             queue.put(TS_array)
 
-    def f_astro_to_n_astro(self, f_astro):
-        eg_list = self._eg_list()
-        n_astro = np.sum([eg.nevts * f_astro for eg in eg_list], axis=1)
-        return n_astro
-            
 
     def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True, return_n_inj=False, mp_cpus=1):
         """Generate a Test Statistic distribution for simulated trials
@@ -393,7 +419,6 @@ class Likelihood():
                 trial_runner = cy.get_trial_runner(conf)
 
                 acceptance = trial_runner.sig_inj_acc_total
-                print(self.Ncount, flux(Defaults.map_E_center[idx_E]), Defaults.map_E_center[idx_E]) 
                 f2flux[i] = 1 / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
             else:
                 exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
