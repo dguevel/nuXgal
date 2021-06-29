@@ -30,7 +30,7 @@ class CskyEventGenerator():
         self.ana = ana
 
         cy.CONF['ana'] = ana
-        ana_dir = Defaults.NUXGAL_ANA_DIR
+        self.ana_dir = Defaults.NUXGAL_ANA_DIR
 
         galaxy_map = hp.read_map(Defaults.GALAXYMAP_FORMAT.format(galaxyName='WISE'))
         galaxy_map[Defaults.idx_muon] = 0.
@@ -50,21 +50,7 @@ class CskyEventGenerator():
 
         self.nevts = np.array(self.nevts)
 
-        conf = {
-            'template': self.galaxy_map,
-            #'flux': cy.hyp.BinnedFlux(Defaults.map_E_edge, self.nevts * self.f_astro_north_truth / np.diff(Defaults.map_E_edge)),
-            'flux': cy.hyp.PowerLawFlux(gamma=2.28),
-            'sigsub': True,
-            'fast_weight': True,
-            'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(ana_dir))
-        }
-
-        self.conf = conf
-        self.trial_runner = cy.get_trial_runner(self.conf)
-
-        ana.save(ana_dir)
-
-        #self._prob_reject()
+        self._prob_reject()
 
     def _prob_reject(self):
         npix = hp.nside2npix(self.nside)
@@ -98,51 +84,54 @@ class CskyEventGenerator():
             Maps of simulated events
         """
 
-        if np.array(f_diff).size == 1:
-            #n_inj = (self.nevts * self.f_astro_north_truth / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * f_diff
-            n_inj = (self.nevts * self.f_astro_north_truth).sum() * N_yr * f_diff
-            self.n_inj = n_inj
-            trial, _ = self.trial_runner.get_one_trial(n_inj)
-            n_atm = self.nevts * (1 - self.f_astro_north_truth * f_diff) * N_yr
-            n_atm = n_atm.astype(int)
+        n_inj = (f_diff * Defaults.f_astro_north_truth * self.nevts).sum() # probably change to the trial_runner.to_ns method
 
-        elif np.array(f_diff).size == self.f_astro_north_truth.size:
-            #n_inj = (self.nevts * f_diff / np.sum(self.galaxy_map * self.prob_reject, axis=1)).sum() * N_yr * len(self.ana)
-            n_inj = (self.nevts * f_diff).sum() * N_yr
-            self.n_inj = n_inj
-            trial, _ = self.trial_runner.get_one_trial(n_inj)
-            n_atm = self.nevts * (1 - f_diff) * N_yr
-            n_atm = n_atm.astype(int)
+        x = Defaults.map_E_edge
+        y = Defaults.f_astro_north_truth * self.nevts * np.sum(self.prob_reject * self.galaxy_map, axis=1)
 
-        else:
-            raise ValueError('Scalar f_diff or f_diff shape equal to f_astro_north_truth')
+        conf = {
+            'template': self.galaxy_map,
+            #'flux': cy.hyp.PowerLawFlux(gamma=2.28),
+            'flux': cy.hyp.BinnedFlux(x, y),
+            'sigsub': True,
+            'fast_weight': True,
+            'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(self.ana_dir))
+        }
+
+        trial_runner = cy.get_trial_runner(conf)
+        trial, _ = trial_runner.get_one_trial(n_inj)
 
 
         # create a sky map of atmospheric nu
-        atm_ra = np.hstack([t[0]['ra'] for t in trial])
-        atm_dec = np.hstack([t[0]['dec'] for t in trial])
-        atm_idx = np.hstack([t[0]['idx'] for t in trial])
-        atm_log10energy = np.hstack([t[0]['log10energy'] for t in trial])
+        atm_ra = trial[0][0]['ra']
+        atm_dec = trial[0][0]['dec']
+        atm_idx = trial[0][0]['idx']
+        atm_log10energy = trial[0][0]['log10energy']
 
-        if f_diff > 0:
-            astro_ra = np.hstack([t[1]['ra'] for t in trial])
-            astro_dec = np.hstack([t[1]['dec'] for t in trial])
-            astro_idx = np.hstack([t[1]['idx'] for t in trial])
-            astro_log10energy = np.hstack([t[1]['log10energy'] for t in trial])
+        if n_inj > 0:
+            astro_ra = trial[0][1]['ra']
+            astro_dec = trial[0][1]['dec']
+            astro_idx = trial[0][1]['idx']
+            astro_log10energy = trial[0][1]['log10energy']
 
+        f_astro = np.zeros(Defaults.f_astro_north_truth.size)
 
         astro_maps = np.zeros((Defaults.NEbin, hp.nside2npix(self.nside)))
         atm_maps = np.zeros((Defaults.NEbin, hp.nside2npix(self.nside)))
         for i, (emin, emax) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
 
-            if np.any(f_diff > 0):
+            if n_inj > 0:
 
                 atm_mask = (atm_log10energy > emin) & (atm_log10energy < emax) & (atm_dec > (np.pi/2 - Defaults.theta_north)) 
                 astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
-                #n_atm = atm_mask.sum() - astro_mask.sum()
-                #if n_atm < 0:
-                #    n_atm = 0
-                included_events = np.random.choice(atm_idx[atm_mask], size=n_atm[i], replace=False)
+                f_astro[i] = astro_mask.sum() / (atm_mask.sum() + astro_mask.sum())
+                if atm_mask.sum() == 0:
+                    f_astro[i] = 1.
+                n_atm = int(atm_mask.sum() * (1 - f_astro[i]))
+
+                if n_atm < 0:
+                    n_atm = 0
+                #included_events = np.random.choice(atm_idx[atm_mask], size=n_atm, replace=False)
 
                 # TODO: add in declination selection
                 #astro_mask = (astro_log10energy > emin) & (astro_log10energy < emax) & (astro_dec > (np.pi/2 - Defaults.theta_north))
@@ -156,9 +145,9 @@ class CskyEventGenerator():
                 #        included_events.extend(np.random.choice(atm_idx[atm_band_mask], size=n_atm, replace=False))
 
 
-                atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
+                #atm_maps[i] = event2map(atm_ra[included_events], atm_dec[included_events], self.nside)
                 #atm_maps[i] = event2map(atm_ra[atm_mask], atm_dec[atm_mask], self.nside)
-                #atm_maps[i] = event2map(atm_ra[atm_mask][:n_atm], atm_dec[atm_mask][:n_atm], self.nside)
+                atm_maps[i] = event2map(atm_ra[atm_mask][:n_atm], atm_dec[atm_mask][:n_atm], self.nside)
                 #atm_maps[i] = event2map(atm_ra[atm_mask][:n_atm[i]], atm_dec[atm_mask][:n_atm[i]], self.nside)
 
                 astro_maps[i] = event2map(astro_ra[astro_mask], astro_dec[astro_mask], self.nside)

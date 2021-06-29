@@ -280,7 +280,7 @@ class Likelihood():
     def get_many_fits(self, N_re, f_astro_in):
         # TODO: multiprocessing
 
-        factor_f2flux = self.factor_f2flux()
+        #factor_f2flux = self.factor_f2flux()
 
         TS = np.zeros(N_re)
         f_astro_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
@@ -311,17 +311,28 @@ class Likelihood():
                 castro = LnLFn(f_Ebin, -lnL_Ebin)
                 TS_Ebin = castro.TS()
                 # if this bin is significant, plot the 1 sigma interval
-                flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f] * factor_f2flux[idx_bestfit_f]
+                flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f]# * factor_f2flux[idx_bestfit_f]
 
-        results = {
-                'f_astro_factor': f_astro_in,
-                'f_astro_inj': f_astro_in * Defaults.f_astro_north_truth[self.Ebinmin: self.Ebinmax],
-                'f_astro_fit': f_astro_fit,
-                'N_astro_inj': sum([(eg.nevts * f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
-                'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
-                'flux_fit': flux_fit,
-                'TS': TS,
-                }
+        if np.array(f_astro_in).size == 1:
+            results = {
+                    'f_astro_factor': f_astro_in,
+                    'f_astro_inj': (f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax],
+                    'f_astro_fit': f_astro_fit,
+                    'N_astro_inj': sum([(eg.nevts * f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
+                    'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
+                    'flux_fit': flux_fit,
+                    'TS': TS,
+                    }
+        else:
+            results = {
+                    'f_astro_factor': np.nan,
+                    'f_astro_inj': f_astro_in[self.Ebinmin: self.Ebinmax],
+                    'f_astro_fit': f_astro_fit,
+                    'N_astro_inj': sum([(eg.nevts * f_astro_in)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
+                    'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
+                    'flux_fit': flux_fit,
+                    'TS': TS,
+                    }
         return results
 
     def _TS(self, N_re, f_diff, eg_list, queue=None):
