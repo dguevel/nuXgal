@@ -148,7 +148,7 @@ class Likelihood():
 
         if self.use_csky:
             if self.N_yr == 3:
-                eg_list = [CskyEventGenerator(ds, version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
             elif self.N_yr == 10:
                 eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
             else:
