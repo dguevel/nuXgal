@@ -313,26 +313,17 @@ class Likelihood():
                 # if this bin is significant, plot the 1 sigma interval
                 flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f]# * factor_f2flux[idx_bestfit_f]
 
-        if np.array(f_astro_in).size == 1:
-            results = {
-                    'f_astro_factor': f_astro_in,
-                    'f_astro_inj': (f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax],
-                    'f_astro_fit': f_astro_fit,
-                    'N_astro_inj': sum([(eg.nevts * f_astro_in * Defaults.f_astro_north_truth)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
-                    'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
-                    'flux_fit': flux_fit,
-                    'TS': TS,
-                    }
-        else:
-            results = {
-                    'f_astro_factor': np.nan,
-                    'f_astro_inj': f_astro_in[self.Ebinmin: self.Ebinmax],
-                    'f_astro_fit': f_astro_fit,
-                    'N_astro_inj': sum([(eg.nevts * f_astro_in)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
-                    'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
-                    'flux_fit': flux_fit,
-                    'TS': TS,
-                    }
+        f_astro_inj = eg_list[0].f_astro_inj[self.Ebinmin: self.Ebinmax]
+
+        results = {
+                'f_astro_factor': f_astro_in,
+                'f_astro_inj': f_astro_inj,
+                'f_astro_fit': f_astro_fit,
+                'N_astro_inj': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_inj for eg in eg_list]),
+                'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
+                'flux_fit': flux_fit,
+                'TS': TS,
+                }
         return results
 
     def _TS(self, N_re, f_diff, eg_list, queue=None):
@@ -506,11 +497,11 @@ class Likelihood():
         except AttributeError:
             if self.use_csky:
                 if self.N_yr == 3:
-                    eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-                    #eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03'),]
+                    #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
+                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03', f_sky=self.f_sky),]
                 elif self.N_yr == 10:
-                    eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
-                    #eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
+                    #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
                 else:
                     raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
 

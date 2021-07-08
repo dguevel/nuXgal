@@ -156,6 +156,7 @@ class EventGenerator():
             f_diff = f_diff * self.f_astro_north_truth
         elif f_diff.size != self.f_astro_north_truth.size:
             raise ValueError('f_diff must be equal to total number of energy bins in f_astro_north_truth')
+        self.f_astro_inj = f_diff
 
         if (f_diff == 0.).all():
             self.n_inj = 0
