@@ -60,7 +60,7 @@ def significance_from_chi(chi):
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, use_csky=True, smeared=True):
+    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, use_csky=True):
         """C'tor
 
         Parameters
@@ -88,7 +88,6 @@ class Likelihood():
         self.w_data = None
         self.Ncount = None
         self.use_csky = use_csky
-        self.smeared = smeared
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -500,7 +499,7 @@ class Likelihood():
             if self.use_csky:
                 if self.N_yr == 3:
                     #eg_list = [CskyEventGenerator([ds,], version='version-002-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
-                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03', f_sky=self.f_sky, smeared=self.smeared),]
+                    eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_3yr, version='version-002-p03', f_sky=self.f_sky),]
                 elif self.N_yr == 10:
                     #eg_list = [CskyEventGenerator([ds,], version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
                     eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]

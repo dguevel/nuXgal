@@ -17,7 +17,7 @@ class CskyEventGenerator():
 
     This can generate both atmospheric and astrophysical events
     """
-    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03', f_sky=1., smeared=True):
+    def __init__(self, year=cy.selections.PSDataSpecs.IC79, astroModel=None, version='version-002-p03', f_sky=1.):
         """C'tor
         """
 
@@ -60,7 +60,6 @@ class CskyEventGenerator():
             'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(self.ana_dir))
         }
 
-        self.smeared = smeared
 
         self.trial_runner = cy.get_trial_runner(self.conf)
 
@@ -111,10 +110,7 @@ class CskyEventGenerator():
                 atm_mask = (atm['log10energy'] > emin) & (atm['log10energy'] < emax) & (atm['dec'] > (np.pi/2 - Defaults.theta_north)) 
 
                 # select astro events in energy bin; template takes care of dec
-                if self.smeared:
-                    astro_mask = (astro['log10energy'] > emin) & (astro['log10energy'] < emax) & (astro['dec'] > (np.pi/2 - Defaults.theta_north))
-                else:
-                    astro_mask = (astro['log10energy'] > emin) & (astro['log10energy'] < emax) & (astro['true_dec'] > (np.pi/2 - Defaults.theta_north))
+                astro_mask = (astro['log10energy'] > emin) & (astro['log10energy'] < emax) & (astro['dec'] > (np.pi/2 - Defaults.theta_north))
 
                 # populate f_astro; edge cases in if and elif blocks
                 if self.nevts[i] == 0:
@@ -134,10 +130,7 @@ class CskyEventGenerator():
 
                 # create sky maps
                 atm_maps[i] = event2map(atm_subset['ra'], atm_subset['dec'], self.nside)
-                if self.smeared:
-                    astro_maps[i] = event2map(astro['ra'][astro_mask], astro['dec'][astro_mask], self.nside)
-                else:
-                    astro_maps[i] = event2map(astro['true_ra'][astro_mask], astro['true_dec'][astro_mask], self.nside)
+                astro_maps[i] = event2map(astro['ra'][astro_mask], astro['dec'][astro_mask], self.nside)
 
             else:
                 # create sky maps
