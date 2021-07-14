@@ -151,7 +151,8 @@ class Likelihood():
             if self.N_yr == 3:
                 eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_3yr]
             elif self.N_yr == 10:
-                eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                #eg_list = [CskyEventGenerator(ds, version='version-003-p03') for ds in cy.selections.PSDataSpecs.ps_10yr]
+                eg_list = [CskyEventGenerator(cy.selections.PSDataSpecs.ps_10yr, version='version-003-p03'),]
             else:
                 raise ValueError('N_yr not defined for use_csky. Choose 3 or 10')
 
