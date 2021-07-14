@@ -83,12 +83,9 @@ class CskyEventGenerator():
 
 
         sr = self.f_sky * 4 * np.pi
-        #n_inj = (f_diff * Defaults.f_astro_north_truth * self.nevts).sum() # probably change to the trial_runner.to_ns method
         n_inj = int(f_diff * self.conf['flux'].to_ns(1.44e-18 * sr, self.trial_runner.sig_inj_acc_total, E0=100000, E2dNdE=False))
 
         trial, _ = self.trial_runner.get_one_trial(n_inj)
-        print(trial)
-
 
         # atmospheric background events
         atm = cy.utils.Arrays.concatenate([t[0] for t in trial])
