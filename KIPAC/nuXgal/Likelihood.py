@@ -82,12 +82,15 @@ class Likelihood():
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax # np.min([np.where(Ncount != 0)[0][-1]+1, 5])
         self.lmin = lmin
-        # scaled mean and std
-        self.calculate_w_mean()
         self.N_yr = N_yr
+        self.use_csky = use_csky
+        # scaled mean and std
+        if self.use_csky:
+            self.calculate_w_mean_csky()
+        else:
+            self.calculate_w_mean()
         self.w_data = None
         self.Ncount = None
-        self.use_csky = use_csky
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -129,6 +132,13 @@ class Likelihood():
         self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
         for i in range(Defaults.NEbin):
             self.w_model_f1[i] = w_mean
+
+    def calculate_w_mean_csky(self):
+        """Load the mean cross correlation including the effect of the PSF.
+        Mean cross correlation is based on csky MC events."""
+        w_mean_file = Defaults.SYNTHETIC_W_MEAN_FORMAT.format(galaxyName=self.gs.galaxyName, nyear=self.N_yr)
+        w_mean = np.loadtxt(w_mean_file)
+        self.w_model_f1 = w_mean
 
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):

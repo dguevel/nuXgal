@@ -53,6 +53,8 @@ SYNTHETIC_EVTMAP_ATM_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_a
 SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_std_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 
+SYNTHETIC_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_mean_{galaxyName}_{nyear}.txt')
+
 SYNTHETIC_TS_NULL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}.txt')
 SYNTHETIC_TS_SIGNAL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}_{astroModel}.txt')
 
