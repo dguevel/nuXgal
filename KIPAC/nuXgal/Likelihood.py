@@ -6,6 +6,8 @@ import healpy as hp
 import emcee
 import corner
 import csky as cy
+from glob import glob
+import re
 
 import multiprocessing as mp
 
@@ -293,6 +295,7 @@ class Likelihood():
         N_astro_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
 
         eg_list = self._eg_list()
+        f_astro_inj = eg_list[0].f_astro_north_truth
 
         for i in range(N_re):
             if self.use_csky:
@@ -304,9 +307,19 @@ class Likelihood():
             self.inputData(ns)
 
             if save:
-                fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=i)
+                files = glob(Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i='*'))
+                if len(files) == 0:
+                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(0).zfill(6))
+                else:
+                    n = int(re.search('[0-9]{6}', max(files)).group(0)) + 1
+                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(n).zfill(6))
+
                 cols = ['Ebin_{j}'.format(j=j) for j in range(Defaults.NEbin)]
-                hp.write_map(fname, datamap, column_names=cols)
+                hdr = [('factor', f_astro_in)]
+                hdr += [('f_inj_{n}'.format(n=k), f_astro_inj[k]) for k in range(Defaults.NEbin)]
+                hdr += [('n_inj_{n}'.format(n=k), f_astro_inj[k] * sum([eg.nevts[k] for eg in eg_list])) for k in range(Defaults.NEbin)]
+
+                hp.write_map(fname, datamap, column_names=cols, extra_header=hdr)
 
             f_astro_fit[i], TS[i] = self.minimize__lnL()
 
@@ -322,13 +335,12 @@ class Likelihood():
                 TS_Ebin = castro.TS()
                 flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f]# * factor_f2flux[idx_bestfit_f]
 
-        f_astro_inj = eg_list[0].f_astro_north_truth[self.Ebinmin: self.Ebinmax]
 
         results = {
                 'f_astro_factor': f_astro_in,
-                'f_astro_inj': f_astro_inj,
+                'f_astro_inj': f_astro_inj[self.Ebinmin: self.Ebinmax],
                 'f_astro_fit': f_astro_fit,
-                'N_astro_inj': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_inj for eg in eg_list]),
+                'N_astro_inj': sum([(eg.nevts * f_astro_inj)[self.Ebinmin: self.Ebinmax] for eg in eg_list]),
                 'N_astro_fit': sum([eg.nevts[self.Ebinmin: self.Ebinmax] * f_astro_fit for eg in eg_list]),
                 'flux_fit': flux_fit,
                 'TS': TS,
