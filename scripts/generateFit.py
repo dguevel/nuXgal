@@ -17,10 +17,11 @@ def main():
     parser.add_argument('--emax', default=4, type=int)
     parser.add_argument('--use-csky', action='store_true')
     parser.add_argument('--compute-std', action='store_true')
+    parser.add_argument('--save-data', action='store_true')
     args = parser.parse_args()
     
     llh = Likelihood(args.N_yr, 'WISE', computeSTD=args.compute_std, Ebinmin=args.emin, Ebinmax=args.emax, lmin=50, use_csky=args.use_csky)
-    fit = llh.get_many_fits(args.N_re, args.f_astro)
+    fit = llh.get_many_fits(args.N_re, args.f_astro, save=args.save_data)
 
     data = np.concatenate([
         np.repeat(fit['f_astro_factor'], fit['TS'].size)[:,np.newaxis],

@@ -282,7 +282,7 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
 
-    def get_many_fits(self, N_re, f_astro_in):
+    def get_many_fits(self, N_re, f_astro_in, save=False):
         # TODO: multiprocessing
 
         #factor_f2flux = self.factor_f2flux()
@@ -303,6 +303,11 @@ class Likelihood():
             ns.inputCountsmap(datamap)
             self.inputData(ns)
 
+            if save:
+                fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=i)
+                cols = ['Ebin_{j}'.format(j=j) for j in range(Defaults.NEbin)]
+                hp.write_map(fname, datamap, column_names=cols)
+
             f_astro_fit[i], TS[i] = self.minimize__lnL()
 
             f_Ebin = np.linspace(0, 4, 1000)
@@ -315,7 +320,6 @@ class Likelihood():
 
                 castro = LnLFn(f_Ebin, -lnL_Ebin)
                 TS_Ebin = castro.TS()
-                # if this bin is significant, plot the 1 sigma interval
                 flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f]# * factor_f2flux[idx_bestfit_f]
 
         f_astro_inj = eg_list[0].f_astro_north_truth[self.Ebinmin: self.Ebinmax]
