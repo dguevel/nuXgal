@@ -24,9 +24,6 @@ class CskyEventGenerator():
         self.year = year
         self.f_sky = f_sky
 
-        #self.f_astro_north_truth = np.array([0, 0.00221405, 0.01216614, 0.15222642, 0., 0., 0.])# * 2.
-        self.f_astro_north_truth = Defaults.f_astro_north_truth.copy()
-
         ana = cy.get_analysis(cy.selections.repo, version, year)
         self.ana = ana
 
@@ -63,6 +60,32 @@ class CskyEventGenerator():
 
         self.trial_runner = cy.get_trial_runner(self.conf)
 
+        self.f_astro_north_truth = self._calculate_f_astro()
+
+    def _calculate_f_astro(self, n_rep=100):
+        """Calculate f_astro for the given configuration."""
+
+        sr = self.f_sky * 4 * np.pi
+        n_inj = int(self.conf['flux'].to_ns(1.44e-18 * sr, self.trial_runner.sig_inj_acc_total, E0=100000, E2dNdE=False))
+
+        f_astro = np.zeros((n_rep, Defaults.NEbin))
+
+        for i in range(n_rep):
+            trial, _ = self.trial_runner.get_one_trial(n_inj)
+
+            astro = cy.utils.Arrays.concatenate([t[1] for t in trial])
+            atm = cy.utils.Arrays.concatenate([t[0] for t in trial])
+
+            for j, (emin, emax) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
+                atm_mask = (atm['log10energy'] > emin) & (atm['log10energy'] < emax) & (atm['dec'] > (np.pi/2 - Defaults.theta_north)) 
+                astro_mask = (astro['log10energy'] > emin) & (astro['log10energy'] < emax) & (astro['dec'] > (np.pi/2 - Defaults.theta_north)) 
+                if atm_mask.sum() + astro_mask.sum() > 0:
+                    f_astro[i, j] = astro_mask.sum() / (atm_mask.sum() + astro_mask.sum())
+                else:
+                    f_astro[i, j] = 0
+
+        f_astro = np.mean(f_astro, axis=0)
+        return f_astro
 
     def SyntheticData(self, N_yr, f_diff):
         """Generate Synthetic Data
@@ -94,9 +117,6 @@ class CskyEventGenerator():
         if n_inj > 0:
             astro = cy.utils.Arrays.concatenate([t[1] for t in trial])
 
-        # N_astro / N_total, populated in energy loop
-        f_astro = np.zeros(Defaults.f_astro_north_truth.size)
-
         # initial sky maps; (n energy bins, healpy pixels)
         astro_maps = np.zeros((Defaults.NEbin, hp.nside2npix(self.nside)))
         atm_maps = np.zeros((Defaults.NEbin, hp.nside2npix(self.nside)))
@@ -112,15 +132,15 @@ class CskyEventGenerator():
                 # populate f_astro; edge cases in if and elif blocks
                 if self.nevts[i] == 0:
                     # happens for highest energy bins, avoid divide by 0
-                    f_astro[i] = 1.
+                    f_astro = 1.
                 elif astro_mask.sum() > self.nevts[i]:
                     # happens occasionally in the bins with few atm counts
-                    f_astro[i] = 1.
+                    f_astro = 1.
                 else:
-                    f_astro[i] = astro_mask.sum() / self.nevts[i]
+                    f_astro = astro_mask.sum() / self.nevts[i]
 
                 # down select the proper number of atm events
-                n_atm = int(self.nevts[i] * (1 - f_astro[i]))
+                n_atm = int(self.nevts[i] * (1 - f_astro))
                 atm_subset = atm[atm_mask]
                 included_events = np.random.choice(len(atm_subset), size=n_atm, replace=False)
                 atm_subset = atm_subset[included_events]
@@ -135,14 +155,15 @@ class CskyEventGenerator():
                 atm_maps[i] = event2map(atm['ra'][atm_mask], atm['dec'][atm_mask], self.nside)
                 astro_maps[i] = np.zeros(hp.nside2npix(self.nside))
 
-        self.f_astro_inj = f_astro.copy()
         data_maps = astro_maps + atm_maps
         return data_maps
 
 
 # TODO: check if this is implemented elsewhere
-def event2map(ra, dec, nside=128):
+def event2map(ra, dec, nside=128, weights=None):
     npix = hp.nside2npix(nside)
     theta = np.pi/2 - dec
-    trial_map = np.histogram(hp.ang2pix(nside, theta, ra), bins=np.arange(npix + 1))[0]
+    if weights is None:
+        weights = np.ones(ra.size)
+    trial_map = np.histogram(hp.ang2pix(nside, theta, ra), bins=np.arange(npix + 1), weights=weights)[0]
     return trial_map

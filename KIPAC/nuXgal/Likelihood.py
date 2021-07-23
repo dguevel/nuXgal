@@ -85,10 +85,7 @@ class Likelihood():
         self.N_yr = N_yr
         self.use_csky = use_csky
         # scaled mean and std
-        if self.use_csky:
-            self.calculate_w_mean_csky()
-        else:
-            self.calculate_w_mean()
+        self.calculate_w_mean()
         self.w_data = None
         self.Ncount = None
 
@@ -126,20 +123,17 @@ class Likelihood():
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
 
-        overdensity_g = hp.alm2map(self.gs.overdensityalm, nside=Defaults.NSIDE, verbose=False)
-        overdensity_g[self.idx_mask] = hp.UNSEEN
-        w_mean = hp.anafast(overdensity_g) / self.f_sky
-        self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
-        for i in range(Defaults.NEbin):
-            self.w_model_f1[i] = w_mean
-
-    def calculate_w_mean_csky(self):
-        """Load the mean cross correlation including the effect of the PSF.
-        Mean cross correlation is based on csky MC events."""
-        w_mean_file = Defaults.SYNTHETIC_W_MEAN_FORMAT.format(galaxyName=self.gs.galaxyName, nyear=self.N_yr)
-        w_mean = np.loadtxt(w_mean_file)
-        self.w_model_f1 = w_mean
-
+        if self.use_csky:
+            w_mean_file = Defaults.SYNTHETIC_W_MEAN_FORMAT.format(galaxyName=self.gs.galaxyName, nyear=self.N_yr)
+            w_mean = np.loadtxt(w_mean_file)
+            self.w_model_f1 = w_mean
+        else:
+            overdensity_g = hp.alm2map(self.gs.overdensityalm, nside=Defaults.NSIDE, verbose=False)
+            overdensity_g[self.idx_mask] = hp.UNSEEN
+            w_mean = hp.anafast(overdensity_g) / self.f_sky
+            self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
+            for i in range(Defaults.NEbin):
+                self.w_model_f1[i] = w_mean
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):
         """Compute the cross correlation distribution for Atmopheric event
@@ -324,7 +318,7 @@ class Likelihood():
                 # if this bin is significant, plot the 1 sigma interval
                 flux_fit[i, idx_bestfit_f] = f_astro_fit[i, idx_bestfit_f] * self.Ncount[idx_bestfit_f]# * factor_f2flux[idx_bestfit_f]
 
-        f_astro_inj = eg_list[0].f_astro_inj[self.Ebinmin: self.Ebinmax]
+        f_astro_inj = eg_list[0].f_astro_north_truth[self.Ebinmin: self.Ebinmax]
 
         results = {
                 'f_astro_factor': f_astro_in,
