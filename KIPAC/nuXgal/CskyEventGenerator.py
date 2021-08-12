@@ -51,7 +51,7 @@ class CskyEventGenerator():
 
         self.conf = {
             'template': self.density_nu,
-            'flux': cy.hyp.PowerLawFlux(gamma=2.28),
+            'flux': cy.hyp.PowerLawFlux(gamma=2.),
             'sigsub': True,
             'fast_weight': False,
             'dir': cy.utils.ensure_dir('{}/templates/WISE'.format(self.ana_dir))

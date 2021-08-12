@@ -284,6 +284,28 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
 
+
+    def generate_data(self, f_astro_factor, output_fname, overwrite=False):
+        eg_list = self._eg_list()
+        f_astro_inj = eg_list[0].f_astro_north_truth * f_astro_factor
+
+        if self.use_csky:
+            datamap = sum([eg.SyntheticData(1., f_diff=f_astro_factor) for eg in eg_list])
+        else:
+            datamap = sum([eg.SyntheticData(1., f_diff=f_astro_factor, density_nu=self.gs.density) for eg in eg_list])
+        ns = NeutrinoSample()
+        ns.inputCountsmap(datamap)
+        self.inputData(ns)
+
+        cols = ['Ebin_{j}'.format(j=j) for j in range(Defaults.NEbin)]
+        hdr = [('factor', f_astro_factor)]
+        hdr += [('f_inj_{n}'.format(n=k), f_astro_inj[k]) for k in range(Defaults.NEbin)]
+        hdr += [('n_inj_{n}'.format(n=k), int(f_astro_inj[k] * self.Ncount[k])) for k in range(Defaults.NEbin)]
+        hdr += [('n_yr', self.N_yr), ('csky', self.use_csky)]
+
+        hp.write_map(output_fname, datamap, column_names=cols, extra_header=hdr, overwrite=overwrite)
+        return datamap
+
     def get_many_fits(self, N_re, f_astro_in, save=False):
         # TODO: multiprocessing
 
@@ -295,7 +317,7 @@ class Likelihood():
         N_astro_fit = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
 
         eg_list = self._eg_list()
-        f_astro_inj = eg_list[0].f_astro_north_truth
+        f_astro_inj = eg_list[0].f_astro_north_truth * f_astro_in
 
         for i in range(N_re):
             if self.use_csky:
@@ -309,15 +331,16 @@ class Likelihood():
             if save:
                 files = glob(Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i='*'))
                 if len(files) == 0:
-                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(0).zfill(6))
+                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(0))
                 else:
                     n = int(re.search('[0-9]{6}', max(files)).group(0)) + 1
-                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(n).zfill(6))
+                    fname = Defaults.SYNTHETIC_EVTMAP_FORMAT.format(i=str(n))
 
                 cols = ['Ebin_{j}'.format(j=j) for j in range(Defaults.NEbin)]
                 hdr = [('factor', f_astro_in)]
                 hdr += [('f_inj_{n}'.format(n=k), f_astro_inj[k]) for k in range(Defaults.NEbin)]
                 hdr += [('n_inj_{n}'.format(n=k), f_astro_inj[k] * sum([eg.nevts[k] for eg in eg_list])) for k in range(Defaults.NEbin)]
+                hdr += [('n_yr', self.N_yr), ('csky', self.use_csky)]
 
                 hp.write_map(fname, datamap, column_names=cols, extra_header=hdr)
 
@@ -455,62 +478,46 @@ class Likelihood():
                                 np.log(10.)) * Defaults.map_E_center[idx_E]
         return np.array(f2flux)
 
-    def upperLimit(self, N_re):
-        """Generate synthetic data sets and calculate median upper limit.
-
-        Parameters
-        ----------
-        N_re : `int`
-            Number of trials
+    def upperLimit(self):
+        """Calculate an upper limit.
 
         Returns
         -------
         upper_limit : `np.array`
-            Upper limit flux
+            Upper limit f_astro
         """
 
-        eg_list = self._eg_list()
-        upper_limit_flux = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
-        upper_limit_f_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
-        upper_limit_N_astro = np.zeros((N_re, self.Ebinmax - self.Ebinmin))
-        TS = np.zeros(N_re)
+        #eg_list = self._eg_list()
+        #upper_limit_flux = np.zeros(self.Ebinmax - self.Ebinmin)
+        upper_limit_f_astro = np.zeros(self.Ebinmax - self.Ebinmin)
+        upper_limit_N_astro = np.zeros(self.Ebinmax - self.Ebinmin)
 
-        factor_f2flux = self.factor_f2flux()
+        #factor_f2flux = self.factor_f2flux()
 
-        for i in range(N_re):
-            if self.use_csky:
-                datamap = sum([eg.SyntheticData(1., f_diff=0) for eg in eg_list])
-            else:
-                datamap = sum([eg.SyntheticData(1., f_diff=0, density_nu=self.gs.density) for eg in eg_list])
-        
-            ns = NeutrinoSample()
-            ns.inputCountsmap(datamap)
+        bestfit_f, TS = self.minimize__lnL()
 
-            self.inputData(ns)
-            ns.updateMask(self.idx_mask)
-            bestfit_f, TS[i] = self.minimize__lnL()
+        f_Ebin = np.linspace(0, 4, 1000)
 
-            f_Ebin = np.linspace(0, 4, 1000)
+        for idx_E in range(self.Ebinmin, self.Ebinmax):
 
-            for idx_E in range(self.Ebinmin, self.Ebinmax):
+            idx_bestfit_f = idx_E - self.Ebinmin
+            lnl_max = self.log_likelihood_Ebin(bestfit_f[idx_bestfit_f], idx_E)
+            lnL_Ebin = np.zeros_like(f_Ebin)
+            for idx_f, f in enumerate(f_Ebin):
+                lnL_Ebin[idx_f] = self.log_likelihood_Ebin(f, idx_E)
 
-                idx_bestfit_f = idx_E - self.Ebinmin
-                lnl_max = self.log_likelihood_Ebin(bestfit_f[idx_bestfit_f], idx_E)
-                lnL_Ebin = np.zeros_like(f_Ebin)
-                for idx_f, f in enumerate(f_Ebin):
-                    lnL_Ebin[idx_f] = self.log_likelihood_Ebin(f, idx_E)
+            castro = LnLFn(f_Ebin, -lnL_Ebin)
 
-                castro = LnLFn(f_Ebin, -lnL_Ebin)
+            f_hi = castro.getLimit(0.1)
+            #f_hi = castro.getLimit(0.05)
 
-                f_hi = castro.getLimit(0.1)
-                #f_hi = castro.getLimit(0.05)
+            #flux_hi = f_hi * self.Ncount[idx_bestfit_f] * factor_f2flux[idx_bestfit_f]
+            #upper_limit_flux[idx_bestfit_f] = flux_hi
+            upper_limit_f_astro[idx_bestfit_f] = f_hi
+            upper_limit_N_astro[idx_bestfit_f] = f_hi * self.Ncount[idx_E]
 
-                flux_hi = f_hi * self.Ncount[idx_bestfit_f] * factor_f2flux[idx_bestfit_f]
-                upper_limit_flux[i, idx_bestfit_f] = flux_hi
-                upper_limit_f_astro[i, idx_bestfit_f] = f_hi
-                upper_limit_N_astro[i, idx_bestfit_f] = f_hi * self.Ncount[idx_E]
-
-        return {'flux': upper_limit_flux, 'f_astro': upper_limit_f_astro, 'n_astro': upper_limit_N_astro, 'TS': TS}
+        #return {'flux': upper_limit_flux, 'f_astro': upper_limit_f_astro, 'n_astro': upper_limit_N_astro, 'TS': TS}
+        return upper_limit_f_astro
 
     def _eg_list(self):
         try:

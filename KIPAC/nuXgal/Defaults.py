@@ -47,7 +47,7 @@ GALAXYALM_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_overdensityalm.f
 
 GALAXYMAP_FIG_FORMAT =  os.path.join(NUXGAL_PLOT_DIR, 'test_{galaxyName}_galaxy.pdf')
 
-SYNTHETIC_EVTMAP_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'skymaps', 'eventmap_astro_{i}.fits.gz')
+SYNTHETIC_EVTMAP_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'skymaps', 'eventmap{i}.fits.gz')
 SYNTHETIC_EVTMAP_ASTRO_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_astro{i}.fits')
 SYNTHETIC_EVTMAP_ATM_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_atm{i}.fits')
 
