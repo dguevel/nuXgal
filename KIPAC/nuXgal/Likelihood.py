@@ -451,32 +451,43 @@ class Likelihood():
         else:
             return TS_array
 
-    def factor_f2flux(self):
-        f2flux = np.zeros((self.Ebinmax - self.Ebinmin))
+    def f2flux(self, f_astro, summed=False, E0=None):
+        factor_f2flux = np.zeros((self.Ebinmax - self.Ebinmin))
+        acceptance = np.zeros((self.Ebinmax - self.Ebinmin))
+
         eg_list = self._eg_list()
 
-        for i, idx_E in enumerate(range(self.Ebinmin, self.Ebinmax)):
-            if self.use_csky:
+        if E0 is None:
+            E0 = Defaults.map_E_center[self.Ebinmin: self.Ebinmax]
+        else:
+            E0 = np.repeat(E0, self.Ebinmax - self.Ebinmin)
+
+        if self.use_csky:
+            for i, idx_E in enumerate(range(self.Ebinmin, self.Ebinmax)):
                 conf = eg_list[0].conf.copy()
-                erange = Defaults.map_E_edge[idx_E: idx_E + 2]
-                flux_model = cy.hyp.PowerLawFlux(gamma=2.28, energy_range=erange)
+                erange = (Defaults.map_E_edge[idx_E], Defaults.map_E_edge[idx_E+1])
+                flux_model = cy.hyp.PowerLawFlux(gamma=2., energy_range=erange)
                 conf['flux'] = flux_model
                 flux = flux_model
                 trial_runner = cy.get_trial_runner(conf)
+                acceptance[i] = trial_runner.sig_inj_acc_total
 
-                acceptance = trial_runner.sig_inj_acc_total
-                f2flux[i] = 1 / acceptance * flux(Defaults.map_E_center[idx_E]) * Defaults.map_E_center[idx_E]**2 / (4 * np.pi * self.f_sky)
-            else:
+            factor_f2flux = 1 / acceptance * flux(E0) * E0**2 / (4 * np.pi * self.f_sky)
+
+        else:
+            for i, idx_E in enumerate(range(self.Ebinmin, self.Ebinmax)):
                 exposuremap = ICECUBE_EXPOSURE_LIBRARY.get_exposure('IC86-2012', 2.28)
 
                 # exposuremap assuming alpha = 2.28 (numu) to convert bestfit f_astro to flux
                 exposuremap_E = exposuremap[idx_E].copy()
                 exposuremap_E[self.idx_mask] = hp.UNSEEN
                 exposuremap_E = hp.ma(exposuremap_E)
-                f2flux[i] = 1 / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
+                factor_f2flux[i] = 1 / (exposuremap_E.mean() * 1e4 * Defaults.DT_SECONDS *
                                 self.N_yr * 4 * np.pi * self.f_sky * Defaults.map_dlogE *
-                                np.log(10.)) * Defaults.map_E_center[idx_E]
-        return np.array(f2flux)
+                                np.log(10.)) * E0[i]
+
+        flux = (f_astro * self.Ncount[self.Ebinmin: self.Ebinmax]) * factor_f2flux
+        return flux
 
     def upperLimit(self):
         """Calculate an upper limit.

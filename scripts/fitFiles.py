@@ -42,7 +42,13 @@ def main():
 
         f_astro_inj = np.array([header['F_INJ_{}'.format(j)] for j in range(args.emin, args.emax)])
         n_astro_inj = llh.Ncount[args.emin: args.emax] * f_astro_inj
-        
+
+        flux_inj = llh.f2flux(f_astro_inj)
+        flux_fit = llh.f2flux(f_astro_fit)
+
+        flux_inj_tot = llh.f2flux(f_astro_inj, E0=100e3).sum()
+        flux_fit_tot = llh.f2flux(f_astro_fit, E0=100e3).sum()
+
         results.append({
             'file': fname,
             'emin': args.emin,
@@ -53,6 +59,10 @@ def main():
             'n_astro_fit': n_astro_fit.tolist(),
             'n_astro_upper_limit': n_astro_ul.tolist(),
             'n_astro_inj': n_astro_inj.tolist(),
+            'flux_inj_ebin': flux_inj.tolist(),
+            'flux_fit_ebin': flux_fit.tolist(),
+            'flux_inj': flux_inj_tot,
+            'flux_fit': flux_fit_tot,
             'TS': TS,
             'TS_ebin': TS_ebin.tolist(),
             'N_yr': header['N_YR'],
