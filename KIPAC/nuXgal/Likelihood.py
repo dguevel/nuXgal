@@ -260,6 +260,22 @@ class Likelihood():
         lnL_le = - (self.w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square / 2.
         return np.sum(lnL_le[:, self.lmin:])
 
+    def log_likelihood_one_bin(self, f):
+        """Compute the log of the likelihood for a particular model
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+        Returns
+        -------
+        logL : `float`
+            The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
+        """
+        w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].sum(axis=0) * f).T
+        w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
+                              self.Ncount[self.Ebinmin : self.Ebinmax]).sum(axis=1)
+        lnL_le = - (np.sum(self.w_data[self.Ebinmin : self.Ebinmax], axis=0) - w_model_mean) ** 2 / w_model_std_square / 2.
+        return np.sum(lnL_le[self.lmin:])
 
 
     def minimize__lnL(self):
@@ -279,6 +295,29 @@ class Likelihood():
         """
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood(*args)
+        initial = 0.5 + 0.1 * np.random.randn(len_f)
+        soln = minimize(nll, initial, bounds=[(-4, 4)] * (len_f))
+        return soln.x, (self.log_likelihood(soln.x) -\
+                            self.log_likelihood(np.zeros(len_f))) * 2
+
+
+    def minimize__lnL_one_bin(self):
+        """Minimize the log-likelihood
+
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+
+        Returns
+        -------
+        x : `array`
+            The parameters that minimize the log-likelihood
+        TS : `float`
+            The Test Statistic, computed as 2 * logL_x - logL_0
+        """
+        len_f = 1
+        nll = lambda *args: -self.log_likelihood_one_bin(*args)
         initial = 0.5 + 0.1 * np.random.randn(len_f)
         soln = minimize(nll, initial, bounds=[(-4, 4)] * (len_f))
         return soln.x, (self.log_likelihood(soln.x) -\
