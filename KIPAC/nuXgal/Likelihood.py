@@ -18,6 +18,7 @@ from .NeutrinoSample import NeutrinoSample
 from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
+from .CskyEventGenerator import CskyEventGenerator
 
 def significance(chi_square, dof):
     """Construct an significance for a chi**2 distribution
@@ -94,6 +95,7 @@ class Likelihood():
             self.w_atm_std_square = self.w_atm_std ** 2
             self.Ncount_atm = np.loadtxt(Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT.format(galaxyName=self.gs.galaxyName,
                                                                                       nyear=str(self.N_yr)))
+            self.Ncount_atm = self.Ncount_atm.reshape(Defaults.NEbin)
 
         self.w_std_square0 = np.zeros((Defaults.NEbin, Defaults.NCL))
         for i in range(Defaults.NEbin):
@@ -140,24 +142,13 @@ class Likelihood():
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
         ns = NeutrinoSample()
-        eg_2010 = EventGenerator('IC79-2010')
-        eg_2011 = EventGenerator('IC86-2011')
-        eg_2012 = EventGenerator('IC86-2012')
+        eg = CskyEventGenerator(self.N_yr, self.gs.density)
 
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
-            eg_2010.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2010.nevts * 1.), clear_parent=False)
 
-            if self.N_yr != 3:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * (self.N_yr - 1.)/2.), clear_parent=False)
-
-            else:
-                eg_2011.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2011.nevts * 1.), clear_parent=False)
-                eg_2012.atm_gen.nevents_expected.set_value(np.random.poisson(eg_2012.nevts * 1.), clear_parent=False)
-
-            eventmap_atm = eg_2010.atm_gen.generate_event_maps(1)[0] + eg_2011.atm_gen.generate_event_maps(1)[0] + eg_2012.atm_gen.generate_event_maps(1)[0]
+            eventmap_atm = eg.SyntheticData(0)
 
             ns.inputCountsmap(eventmap_atm)
             ns.updateMask(self.idx_mask)
@@ -191,7 +182,6 @@ class Likelihood():
         ns.updateMask(self.idx_mask)
         self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.Ncount = ns.getEventCounts()
-
 
 
     def log_likelihood_Ebin(self, f, energyBin):

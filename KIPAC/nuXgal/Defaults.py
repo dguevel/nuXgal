@@ -12,7 +12,7 @@ VERBOSE = False
 NSIDE = 128             # About 1 square degree pixels
 LOG_EMIN = 1.5           # 100 GeV
 LOG_EMAX = 8.5           # 1e9 GeV
-NEEdges = 8             # 8 edges, 7 bins, 1 bin per decade
+NEEdges = 2             # 8 edges, 7 bins, 1 bin per decade
 
 DT_DAYS = 333           # Length of run1
 DT_SECONDS = 28771200   # 333 * 86400
@@ -34,6 +34,7 @@ NUXGAL_DATA_DIR = os.path.join(NUXGAL_DIR, 'data', 'data')
 NUXGAL_SYNTHETICDATA_DIR = os.path.join(NUXGAL_DIR, 'syntheticData')
 NUXGAL_PLOT_DIR = os.path.join(NUXGAL_DIR, 'plots')
 TESTFIG_DIR = os.path.join(NUXGAL_PLOT_DIR, 'test')
+NUXGAL_ANA_DIR = os.path.join(NUXGAL_DIR, 'data', 'ana')
 
 # Format strings for file paths
 NCOSTHETA_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'Ncos_theta_{year}_{ebin}.txt')
