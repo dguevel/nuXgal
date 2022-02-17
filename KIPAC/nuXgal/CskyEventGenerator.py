@@ -7,7 +7,8 @@ import numpy as np
 from . import Defaults
 
 class CskyEventGenerator():
-    def __init__(self, N_yr, density_nu, gamma=2, weighted=True):
+    def __init__(self, N_yr, density_nu, galaxyName, gamma=2, weighted=True):
+        self.galaxyName = galaxyName
         self.npix = density_nu.size
         self.nside = hp.npix2nside(self.npix)
         self.ana_dir = Defaults.NUXGAL_ANA_DIR
@@ -16,7 +17,7 @@ class CskyEventGenerator():
 
         self.dataspec = {
             3: cy.selections.PSDataSpecs.ps_3yr,
-            10: cy.selections.PSDataSpecs.ps_10yr}[N_yr][0]
+            10: cy.selections.PSDataSpecs.ps_10yr}[N_yr]
 
         density_nu = density_nu.copy()
         density_nu[Defaults.idx_muon] = 0
@@ -29,9 +30,25 @@ class CskyEventGenerator():
             'flux': cy.hyp.PowerLawFlux(self.gamma),
             'sigsub': True,
             'fast_weight': True,
-            'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', 'WISE').format(self.ana_dir))
+            'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         }
         self.trial_runner = cy.get_trial_runner(self.conf)
+        self.SaveBlurredTemplate()
+
+    def SaveBlurredTemplate(self):
+        """Save the acceptance weighted PSF smeared template."""
+
+        sigma_bins = np.arange(0, 3.1, .1)
+        smoothed_template = np.zeros(self.npix)
+        for i, subana in enumerate(self.ana):
+            weights, _ = np.histogram(np.degrees(subana.data['sigma']), bins=sigma_bins, normed=True)
+            smoothed = np.zeros((weights.size, self.density_nu.size))
+            for j, sigma in enumerate(sigma_bins[:-1]):
+                smoothed[j] = hp.smoothing(self.density_nu, sigma=np.radians(sigma)) * weights[j]
+            smoothed_template += self.trial_runner.sig_inj_probs[i] * np.sum(smoothed, axis=0)
+        smoothed_template /= smoothed_template.sum()
+        hp.write_map(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.galaxyName), smoothed_template, overwrite=True)
+
 
 
     def SyntheticData(self, ninj):
@@ -44,7 +61,7 @@ class CskyEventGenerator():
                 elo = Defaults.map_logE_edge[i]
                 ehi = Defaults.map_logE_edge[i + 1]
                 if len(evt) == 2:
-                    evt[1]['energy'] = 10 ** evt[1]['log10energy']# have to add this column to astro events
+                    evt[1]['energy'] = 10 ** evt[1]['log10energy']  # have to add this column to astro events
                     evt = cy.utils.Arrays.concatenate(evt)
                 else:
                     evt = evt[0]
@@ -59,5 +76,5 @@ class CskyEventGenerator():
                 else:
                     weights = np.ones(pixels.size)
                 countsmap[i, pixels] += weights
-
+        countsmap[:, Defaults.idx_muon] = 0
         return countsmap
