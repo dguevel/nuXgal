@@ -37,7 +37,7 @@ class CskyEventGenerator():
             'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         }
         self.trial_runner = cy.get_trial_runner(self.conf)
-        self.getBlurredTemplate(load=False)
+        self.getBlurredTemplate()
 
     def updateGamma(self, gamma):
         self.conf['flux'] = cy.hyp.PowerLawFlux(gamma)
