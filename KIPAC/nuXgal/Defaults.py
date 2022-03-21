@@ -10,8 +10,8 @@ VERBOSE = False
 
 # Fixed parameters for the Neutrino sample
 NSIDE = 128             # About 1 square degree pixels
-LOG_EMIN = 1.5           # 100 GeV
-LOG_EMAX = 8.5           # 1e9 GeV
+LOG_EMIN = 1.5          # 100 GeV
+LOG_EMAX = 8.5          # 1e9 GeV
 NEEdges = 2             # 8 edges, 7 bins, 1 bin per decade
 
 DT_DAYS = 333           # Length of run1
@@ -44,7 +44,7 @@ TABULATED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-TabulatedAeff.txt')
 ANALYTIC_CL_PATH = os.path.join(NUXGAL_ANCIL_DIR, 'Cl_ggRM.dat')
 GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
 GALAXYALM_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_overdensityalm.fits')
-BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_blurred_galaxy_map.fits')
+BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_blurred_galaxymap.npy')
 
 GALAXYMAP_FIG_FORMAT =  os.path.join(NUXGAL_PLOT_DIR, 'test_{galaxyName}_galaxy.pdf')
 

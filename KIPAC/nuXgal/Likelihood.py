@@ -80,6 +80,7 @@ class Likelihood():
         self.Ebinmax = Ebinmax # np.min([np.where(Ncount != 0)[0][-1]+1, 5])
         self.lmin = lmin
         # scaled mean and std
+        self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName)
         self.calculate_w_mean()
         self.N_yr = N_yr
         self.w_data = None
@@ -120,20 +121,13 @@ class Likelihood():
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
         pass  # TODO: implement <Cl> using csky
-        density_nu = hp.read_map(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
-        density_nu = density_nu.reshape(Defaults.NEbin, density_nu.size)
-        density_nu = np.repeat(density_nu[np.newaxis,:], Defaults.NEbin, axis=0)
+
+        w_model_f1 = []
+        templates = np.load(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
         ns = NeutrinoSample()
-        ns.inputCountsmap(density_nu)
+        ns.inputCountsmap(templates)
         w_mean = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.w_model_f1 = np.array(w_mean)
-
-        #overdensity_g = hp.alm2map(self.gs.overdensityalm, nside=Defaults.NSIDE, verbose=False)
-        #overdensity_g[self.idx_mask] = hp.UNSEEN
-        #w_mean = hp.anafast(overdensity_g) / self.f_sky
-        #self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
-        #for i in range(Defaults.NEbin):
-        #    self.w_model_f1[i] = w_mean
 
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):
@@ -150,13 +144,12 @@ class Likelihood():
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
         ns = NeutrinoSample()
-        eg = CskyEventGenerator(self.N_yr, self.gs.density, self.gs.galaxyName)
-
+        eg = self.event_generator
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
 
-            eventmap_atm = eg.SyntheticData(0)
+            eventmap_atm = eg.SyntheticData(0)[0]
 
             ns.inputCountsmap(eventmap_atm)
             ns.updateMask(self.idx_mask)
