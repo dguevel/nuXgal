@@ -5,6 +5,7 @@ import healpy as hp
 import numpy as np
 
 from . import Defaults
+from .DataSpec import ps_3yr, ps_10yr
 
 class CskyEventGenerator():
     def __init__(self, N_yr, density_nu, galaxyName, gamma=2, weighted=True, Ebinmin=0, Ebinmax=-1):
@@ -18,16 +19,14 @@ class CskyEventGenerator():
         self.emax = Defaults.map_logE_edge[Ebinmax]
 
         self.dataspec = {
-            3: cy.selections.PSDataSpecs.ps_3yr,
-            10: cy.selections.PSDataSpecs.ps_10yr}[N_yr]
+            3: ps_3yr,
+            10: ps_10yr}[N_yr][0]
 
         density_nu = density_nu.copy()
         density_nu[Defaults.idx_muon] = 0
         self.density_nu = density_nu / density_nu.sum()
 
         self.ana = cy.get_analysis(cy.selections.repo, 'version-003-p03', self.dataspec)
-        for i, subana in enumerate(self.ana):
-            self.ana[i].sig = subana.sig[(subana.sig['log10energy'] > self.emin) * (subana.sig['log10energy'] < self.emax)]
         self.conf = {
             'ana': self.ana,
             'template': density_nu.copy(),
@@ -37,11 +36,12 @@ class CskyEventGenerator():
             'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         }
         self.trial_runner = cy.get_trial_runner(self.conf)
-        self.getBlurredTemplate()
+        self.getBlurredTemplate(load=False)
 
     def updateGamma(self, gamma):
         self.conf['flux'] = cy.hyp.PowerLawFlux(gamma)
         self.trial_runner = cy.get_trial_runner(self.conf)
+        self.getBlurredTemplate(load=False)
 
     def getBlurredTemplate(self, save=True, load=True):
         """Save the acceptance weighted PSF smeared template."""
@@ -59,15 +59,14 @@ class CskyEventGenerator():
                 energy_weights = sig_inj.flux_weights[idx]
                 sigma_err = np.degrees(sig_inj.sig['sigma'][idx])
                 weights, _ = np.histogram(sigma_err, bins=sigma_bins, normed=True, weights=energy_weights)
-                #weights, _ = np.histogram(sigma_err, bins=sigma_bins, normed=True)
                 smoothed = np.zeros((weights.size, self.density_nu.size))
                 for k, sigma in enumerate(sigma_bins[:-1]):
                     smoothed[k] = hp.smoothing(self.density_nu, sigma=np.radians(sigma)) * weights[k]
                 smoothed_template[j] += self.trial_runner.sig_inj_probs[i] * np.sum(smoothed, axis=0)
             smoothed_template[j] /= smoothed_template[j].sum()
-            if save:
-                fname = Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.galaxyName)
-                np.save(fname, smoothed_template)
+        if save:
+            fname = Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.galaxyName)
+            np.save(fname, smoothed_template)
         return smoothed_template
 
 

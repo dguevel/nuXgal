@@ -57,7 +57,7 @@ def significance_from_chi(chi):
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin):
+    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, weighted=True, gamma=2.):
         """C'tor
 
         Parameters
@@ -80,7 +80,7 @@ class Likelihood():
         self.Ebinmax = Ebinmax # np.min([np.where(Ncount != 0)[0][-1]+1, 5])
         self.lmin = lmin
         # scaled mean and std
-        self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName)
+        self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, weighted=weighted, gamma=gamma)
         self.calculate_w_mean()
         self.N_yr = N_yr
         self.w_data = None
@@ -120,10 +120,10 @@ class Likelihood():
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
-        pass  # TODO: implement <Cl> using csky
 
         w_model_f1 = []
-        templates = np.load(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
+        #templates = np.load(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
+        templates = self.event_generator.getBlurredTemplate()
         ns = NeutrinoSample()
         ns.inputCountsmap(templates)
         w_mean = ns.getCrossCorrelation(self.gs.overdensityalm)
