@@ -25,6 +25,7 @@ def main():
     unweighted_f = np.zeros(args.n_trials)
     nfit = np.zeros(args.n_trials)
     flux_fit = np.zeros(args.n_trials)
+    flux_inj = np.zeros(args.n_trials)
     TS = np.zeros(args.n_trials)
 
     llh = Likelihood(10, 'WISE', False, 0, 1, 50, gamma=args.gamma)
@@ -41,6 +42,7 @@ def main():
         unweighted_f[i] = llh.weighted_f_to_f(weighted_f[i], args.gamma)
         nfit[i] = llh.Ncount * weighted_f[i]
         flux_fit[i] = llh.event_generator.trial_runner.to_dNdE(nfit[i], E0=1e5) / (4*np.pi*llh.f_sky)
+        flux_inj[i] = llh.event_generator.trial_runner.to_dNdE(args.n_inject, E0=1e5) / (4*np.pi*llh.f_sky)
 
 
     data = pd.DataFrame({
@@ -48,7 +50,9 @@ def main():
         'TS': TS,
         'unweighted_f': unweighted_f,
         'nfit': nfit,
-        'flux_fit': flux_fit})
+        'ninj': args.n_trials * [args.n_inject,],
+        'flux_fit': flux_fit,
+        'flux_inj': flux_inj})
     data.to_csv(args.output, index=False)
 
 if __name__ == '__main__':
