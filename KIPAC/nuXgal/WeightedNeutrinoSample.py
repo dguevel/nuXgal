@@ -1,4 +1,3 @@
-from tkinter import W
 import healpy as hp
 import numpy as np
 
