@@ -16,7 +16,7 @@ def main():
     parser.add_argument('-n', '--n-trials', help='Number of trials', type=int)
     parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int)
     parser.add_argument('-o', '--output')
-    parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5)
+    parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5, type=float)
     args = parser.parse_args()
     print(args.n_trials, args.output)
 
