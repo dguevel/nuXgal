@@ -118,7 +118,7 @@ class NeutrinoSample():
         overdensity = self.getOverdensity()
         alm_nu = [hp.sphtfunc.map2alm(overdensity[i]) for i in range(Defaults.NEbin)]
         w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
-        return w_cross
+        return np.array(w_cross)
 
 
     def plotCountsmap(self, testfigpath):
@@ -127,6 +127,8 @@ class NeutrinoSample():
         figs.mollview_maps('countsmap', self.countsmap)
         figs.save_all(testfigpath, 'pdf')
 
+    def updateCountsMap(self, *args):
+        pass
 
 
     #def getCrossCorrelation_countsmap(self, countsmap, overdensityMap_g, idx_mask):

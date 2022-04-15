@@ -11,10 +11,12 @@ import matplotlib
 
 from scipy.optimize import minimize
 from scipy.stats import norm, distributions
+from scipy.interpolate import interp1d
 
 from .EventGenerator import EventGenerator
 from . import Defaults
 from .NeutrinoSample import NeutrinoSample
+from .WeightedNeutrinoSample import WeightedNeutrinoSample
 from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
@@ -57,7 +59,7 @@ def significance_from_chi(chi):
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, weighted=True, gamma=2.):
+    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.):
         """C'tor
 
         Parameters
@@ -80,11 +82,12 @@ class Likelihood():
         self.Ebinmax = Ebinmax # np.min([np.where(Ncount != 0)[0][-1]+1, 5])
         self.lmin = lmin
         # scaled mean and std
-        self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, weighted=weighted, gamma=gamma)
+        self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, gamma=gamma)
         self.calculate_w_mean()
         self.N_yr = N_yr
         self.w_data = None
         self.Ncount = None
+        self.gamma = gamma
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -116,18 +119,51 @@ class Likelihood():
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
 
-    def calculate_w_mean(self):
+    def calculate_w_mean(self, load=True, save=True):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
 
         w_model_f1 = []
-        #templates = np.load(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
-        templates = self.event_generator.getBlurredTemplate()
-        ns = NeutrinoSample()
-        ns.inputCountsmap(templates)
-        w_mean = ns.getCrossCorrelation(self.gs.overdensityalm)
-        self.w_model_f1 = np.array(w_mean)
+        templates = self.getTemplate(load=load, save=save)
+        for tmp in templates:
+            ns = NeutrinoSample()
+            ns.inputCountsmap(tmp)
+            w_model_f1.append(ns.getCrossCorrelation(self.gs.overdensityalm))
+        self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_f1), axis=0)
+
+
+    def getTemplate(self, save=True, load=True):
+        """Save the acceptance weighted PSF smeared template."""
+        # TODO copy signal event code from template injector
+
+        fname = os.path.join(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
+        if load and os.path.exists(fname):
+            templates = np.load(fname)
+            return templates
+        gammas = Defaults.GAMMAS
+        eg = self.event_generator
+        templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
+        for j, g in enumerate(gammas):
+            eg.updateGamma(g)
+            for i in range(Defaults.NEbin):
+                for injector, subana in zip(self.event_generator.trial_runner.sig_injs, self.event_generator.ana):
+                    # oversample synthetic events
+                    for k in range(20):
+                        # borrowed from csky template injector
+                        sig = injector.sig
+                        tm = injector.template_model
+                        delta_ra = np.random.uniform(0, 2*np.pi, len(sig))
+                        true_pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.true_dec, sig.true_ra + delta_ra)
+                        weights = injector.flux_weights * tm.template[true_pixels] * subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
+                        weights /= np.sum(weights)
+                        pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.dec, sig.ra + delta_ra)
+                        templates[j, i, pixels] += weights
+
+        #templates[:, :, tm.template == 0] = 0
+        if save:
+            np.save(fname, templates)
+        return templates
 
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):
@@ -143,15 +179,19 @@ class Likelihood():
 
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
-        ns = NeutrinoSample()
+        ns = WeightedNeutrinoSample()
         eg = self.event_generator
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
 
-            eventmap_atm = eg.SyntheticData(0)[0]
+            #eventmap_atm = eg.SyntheticData(0)[0]
 
-            ns.inputCountsmap(eventmap_atm)
+            #ns.inputCountsmap(eventmap_atm)
+            #ns.updateMask(self.idx_mask)
+            trial = eg.SyntheticTrial(0)
+            ns.inputTrial(trial)
+            ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateMask(self.idx_mask)
             w_cross[iteration] = ns.getCrossCorrelation(self.gs.overdensityalm)
             Ncount_av = Ncount_av + ns.getEventCounts()
@@ -180,8 +220,8 @@ class Likelihood():
         -------
         None
         """
-        ns.updateMask(self.idx_mask)
-        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
+        self.neutrino_sample = ns
+        #self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.Ncount = ns.getEventCounts()
 
 
@@ -206,7 +246,7 @@ class Likelihood():
         return np.sum(lnL_le[self.lmin:])
 
 
-    def log_likelihood(self, f):
+    def log_likelihood(self, params, gamma=None):
         """Compute the log of the likelihood for a particular model
 
         Parameters
@@ -219,15 +259,46 @@ class Likelihood():
         logL : `float`
             The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
         """
-        w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
+
+        if gamma is None:
+            f = params[:-1]
+            gamma = params[-1]
+
+            self.neutrino_sample.updateCountsMap(gamma, self.event_generator.ana)
+            self.neutrino_sample.updateMask(self.idx_mask)
+        else:
+            f = params
+
+        w_data = self.neutrino_sample.getCrossCorrelation(self.gs.overdensityalm)
+        Ncount = self.neutrino_sample.getEventCounts()
+
+        w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
         w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
-                              self.Ncount[self.Ebinmin : self.Ebinmax]).T
-        lnL_le = - (self.w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square / 2.
+                              Ncount[self.Ebinmin : self.Ebinmax]).T
+        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square / 2.
         return np.sum(lnL_le[:, self.lmin:])
 
-
-
     def minimize__lnL(self):
+        """Minimize the log-likelihood
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+        Returns
+        -------
+        x : `array`
+            The parameters that minimize the log-likelihood
+        TS : `float`
+            The Test Statistic, computed as 2 * logL_x - logL_0
+        """
+        len_f = self.Ebinmax - self.Ebinmin
+        nll = lambda *args: -self.log_likelihood(*args, gamma=self.gamma)
+        initial = 0.5 + 0.1 * np.random.randn(len_f)
+        soln = minimize(nll, initial, bounds=[(-4, 4)] * (len_f))
+        return soln.x, (self.log_likelihood(soln.x, gamma=self.gamma) -\
+                            self.log_likelihood(np.zeros(len_f), gamma=self.gamma)) * 2
+
+    def minimize__lnL_free_index(self):
         """Minimize the log-likelihood
 
         Parameters
@@ -242,13 +313,33 @@ class Likelihood():
         TS : `float`
             The Test Statistic, computed as 2 * logL_x - logL_0
         """
-        len_f = self.Ebinmax - self.Ebinmin
+        len_f = (self.Ebinmax - self.Ebinmin)
         nll = lambda *args: -self.log_likelihood(*args)
         initial = 0.5 + 0.1 * np.random.randn(len_f)
-        soln = minimize(nll, initial, bounds=[(-4, 4)] * (len_f))
+        initial = np.hstack([initial, [2.5]])
+        bounds = len_f * [[-4, 4],] + [[Defaults.GAMMAS.min(), Defaults.GAMMAS.max()]]
+        soln = minimize(nll, initial, bounds=bounds)
+        null_x = len_f * [0] + [2.5]
         return soln.x, (self.log_likelihood(soln.x) -\
-                            self.log_likelihood(np.zeros(len_f))) * 2
+                            self.log_likelihood(null_x)) * 2
 
+    def weighted_f_to_f(self, weighted_f, gamma):
+        """Convert weighted fraction f to unweighted f. 
+        The conversion is based on empirical scaling 
+        relation from MC and atmospheric data"""
+
+        alpha = -0.41332594
+        beta = np.exp(0.3242447)
+        return weighted_f * gamma ** alpha / beta
+
+    def f_to_weighted_f(self, f, gamma):
+        """Convert weighted fraction f to unweighted f. 
+        The conversion is based on empirical scaling 
+        relation from MC and atmospheric data"""
+
+        alpha = -0.41332594
+        beta = np.exp(0.3242447)
+        return f * gamma ** -alpha * beta
 
 
     def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):

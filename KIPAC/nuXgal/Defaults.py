@@ -88,3 +88,5 @@ ell = np.arange(NCL)                       # Array of all l values, useful in pl
 exposuremap_theta, exposuremap_phi = hp.pixelfunc.pix2ang(NSIDE, np.arange(NPIXEL))
 theta_north = np.radians(95.)
 idx_muon = np.where(exposuremap_theta > theta_north)
+
+GAMMAS = np.arange(1.5, 4.1, .5)
