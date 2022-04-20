@@ -19,7 +19,7 @@ class CskyEventGenerator():
 
         self.dataspec = {
             3: ps_3yr,
-            10: ps_10yr}[N_yr] 
+            10: ps_10yr}[N_yr]
 
         density_nu = density_nu.copy()
         density_nu[Defaults.idx_muon] = 0

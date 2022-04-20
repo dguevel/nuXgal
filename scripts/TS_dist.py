@@ -37,10 +37,10 @@ def main():
         ns = WeightedNeutrinoSample()
         ns.inputTrial(trial)
         llh.inputData(ns)
-        ns.updateCountsMap(2.5, llh.event_generator.ana)
+        ns.updateCountsMap(args.gamma, llh.event_generator.ana)
         weighted_f[i], TS[i] = llh.minimize__lnL()
         unweighted_f[i] = llh.weighted_f_to_f(weighted_f[i], args.gamma)
-        nfit[i] = llh.Ncount * weighted_f[i]
+        nfit[i] = llh.Ncount * unweighted_f[i]
         flux_fit[i] = llh.event_generator.trial_runner.to_dNdE(nfit[i], E0=1e5) / (4*np.pi*llh.f_sky)
         flux_inj[i] = llh.event_generator.trial_runner.to_dNdE(args.n_inject, E0=1e5) / (4*np.pi*llh.f_sky)
 
