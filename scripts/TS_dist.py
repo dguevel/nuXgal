@@ -17,6 +17,7 @@ def main():
     parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int)
     parser.add_argument('-o', '--output')
     parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5, type=float)
+    parser.add_argument('--compute-std', action='store_true')
     args = parser.parse_args()
     print(args.n_trials, args.output)
 
@@ -28,7 +29,7 @@ def main():
     flux_inj = np.zeros(args.n_trials)
     TS = np.zeros(args.n_trials)
 
-    llh = Likelihood(10, 'WISE', False, 0, 1, 50, gamma=args.gamma)
+    llh = Likelihood(10, 'WISE', args.compute_std, 0, 1, 50, gamma=args.gamma)
     llh.getTemplate()
     eg = llh.event_generator
 
@@ -37,7 +38,7 @@ def main():
         ns = WeightedNeutrinoSample()
         ns.inputTrial(trial)
         llh.inputData(ns)
-        ns.updateCountsMap(2.5, llh.event_generator.ana)
+        ns.updateCountsMap(args.gamma, llh.event_generator.ana)
         weighted_f[i], TS[i] = llh.minimize__lnL()
         unweighted_f[i] = llh.weighted_f_to_f(weighted_f[i], args.gamma)
         nfit[i] = llh.Ncount * weighted_f[i]
