@@ -328,18 +328,18 @@ class Likelihood():
         The conversion is based on empirical scaling 
         relation from MC and atmospheric data"""
 
-        alpha = -0.41332594
-        beta = np.exp(-0.3242447)
-        return weighted_f * gamma ** -alpha * beta
+        alpha = -0.91549942
+        beta = 1.1085688
+        return weighted_f * gamma ** -alpha * np.exp(-beta)
 
     def f_to_weighted_f(self, f, gamma):
         """Convert weighted fraction f to unweighted f. 
         The conversion is based on empirical scaling 
         relation from MC and atmospheric data"""
 
-        alpha = -0.41332594
-        beta = np.exp(0.3242447)
-        return f * gamma ** alpha * beta
+        alpha = -0.91549942
+        beta = 1.1085688
+        return f * gamma ** alpha * np.exp(beta)
 
 
     def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):
