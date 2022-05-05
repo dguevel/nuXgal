@@ -147,7 +147,7 @@ class Likelihood():
         for j, g in enumerate(gammas):
             eg.updateGamma(g)
             for i in range(Defaults.NEbin):
-                for injector, subana in zip(self.event_generator.trial_runner.sig_injs, self.event_generator.ana):
+                for injector, subana, probs in zip(self.event_generator.trial_runner.sig_injs, self.event_generator.ana, self.event_generator.trial_runner.sig_inj_probs):
                     # oversample synthetic events
                     for k in range(20):
                         # borrowed from csky template injector
@@ -155,8 +155,8 @@ class Likelihood():
                         tm = injector.template_model
                         delta_ra = np.random.uniform(0, 2*np.pi, len(sig))
                         true_pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.true_dec, sig.true_ra + delta_ra)
-                        weights = injector.flux_weights * tm.template[true_pixels] * subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
-                        weights /= np.sum(weights)
+                        weights = probs * injector.flux_weights * tm.template[true_pixels] * subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
+                        #weights /= np.sum(weights)
                         pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.dec, sig.ra + delta_ra)
                         templates[j, i, pixels] += weights
 
