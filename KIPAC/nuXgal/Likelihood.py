@@ -155,7 +155,8 @@ class Likelihood():
                         tm = injector.template_model
                         delta_ra = np.random.uniform(0, 2*np.pi, len(sig))
                         true_pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.true_dec, sig.true_ra + delta_ra)
-                        weights = probs * injector.flux_weights * tm.template[true_pixels] * subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
+                        pdf_ratio = subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
+                        weights = probs * injector.flux_weights * tm.template[true_pixels] * pdf_ratio/(1+pdf_ratio)
                         #weights /= np.sum(weights)
                         pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.dec, sig.ra + delta_ra)
                         templates[j, i, pixels] += weights
