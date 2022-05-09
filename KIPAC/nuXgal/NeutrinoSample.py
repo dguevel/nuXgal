@@ -24,6 +24,25 @@ class NeutrinoSample():
         self.countsmap_fullsky = None
 
 
+    def inputTrial(self, trial):
+        self.event_list = trial
+        self.countsMap()
+        self.countsmap_fullsky = self.countsmap.copy()
+
+    def countsMap(self):
+        countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+        for i in range(Defaults.NEbin):
+            for evt in self.event_list:
+                for tr in evt:
+                    elo = Defaults.map_logE_edge[i]
+                    ehi = Defaults.map_logE_edge[i + 1]
+                    idx = (tr['log10energy'] > elo) * (tr['log10energy'] < ehi)
+                    ra = np.degrees(tr['ra'][idx])
+                    dec = np.degrees(tr['dec'][idx])
+                    pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
+                    countsmap[i, pixels] += 1
+        self.countsmap = countsmap
+
     def inputCountsmap(self, countsmap):
         """Set the counts map
 
@@ -127,7 +146,7 @@ class NeutrinoSample():
         figs.mollview_maps('countsmap', self.countsmap)
         figs.save_all(testfigpath, 'pdf')
 
-    def updateCountsMap(self, *args):
+    def updateCountsMap(self, *args, **kwargs):
         pass
 
 

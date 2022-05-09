@@ -59,6 +59,10 @@ def significance_from_chi(chi):
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
+    BlurredGalaxyMapFname = Defaults.BLURRED_GALAXYMAP_FORMAT
+    AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
+    AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
+
     def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.):
         """C'tor
 
@@ -76,15 +80,19 @@ class Likelihood():
             minimum of l to be taken into account in likelihood
         """
 
+        self.N_yr = N_yr
         self.gs = GALAXY_LIBRARY.get_sample(galaxyName)
+        self.BlurredGalaxyMapFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName)
+        self.AtmSTDFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.neutrino_sample_class = NeutrinoSample
         self.anafastMask()
         self.Ebinmin = Ebinmin
-        self.Ebinmax = Ebinmax # np.min([np.where(Ncount != 0)[0][-1]+1, 5])
+        self.Ebinmax = Ebinmax
         self.lmin = lmin
         # scaled mean and std
         self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, gamma=gamma)
         self.calculate_w_mean()
-        self.N_yr = N_yr
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -93,12 +101,10 @@ class Likelihood():
         if computeSTD:
             self.computeAtmophericEventDistribution(N_re=500, writeMap=True)
         else:
-            w_atm_std_file = np.loadtxt(Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT.format(galaxyName=self.gs.galaxyName,
-                                                                                            nyear=str(self.N_yr)))
+            w_atm_std_file = np.loadtxt(self.AtmSTDFname)
             self.w_atm_std = w_atm_std_file.reshape((Defaults.NEbin, Defaults.NCL))
             self.w_atm_std_square = self.w_atm_std ** 2
-            self.Ncount_atm = np.loadtxt(Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT.format(galaxyName=self.gs.galaxyName,
-                                                                                      nyear=str(self.N_yr)))
+            self.Ncount_atm = np.loadtxt(self.AtmNcountsFname)
             self.Ncount_atm = self.Ncount_atm.reshape(Defaults.NEbin)
 
         self.w_std_square0 = np.zeros((Defaults.NEbin, Defaults.NCL))
@@ -127,20 +133,21 @@ class Likelihood():
         w_model_f1 = []
         templates = self.getTemplate(load=load, save=save)
         for tmp in templates:
-            ns = NeutrinoSample()
+            ns = self.neutrino_sample_class()
             ns.inputCountsmap(tmp)
             w_model_f1.append(ns.getCrossCorrelation(self.gs.overdensityalm))
         self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_f1), axis=0)
 
 
-    def getTemplate(self, save=True, load=True):
+    def getTemplate(self, save=True, load=False):
         """Save the acceptance weighted PSF smeared template."""
-        # TODO copy signal event code from template injector
 
-        fname = os.path.join(Defaults.BLURRED_GALAXYMAP_FORMAT.format(galaxyName=self.gs.galaxyName))
+        fname = self.BlurredGalaxyMapFname
+
         if load and os.path.exists(fname):
             templates = np.load(fname)
             return templates
+
         gammas = Defaults.GAMMAS
         eg = self.event_generator
         templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
@@ -155,16 +162,19 @@ class Likelihood():
                         tm = injector.template_model
                         delta_ra = np.random.uniform(0, 2*np.pi, len(sig))
                         true_pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.true_dec, sig.true_ra + delta_ra)
-                        pdf_ratio = subana.energy_pdf_ratio_model(sig)(gamma=g)[1]
-                        weights = probs * injector.flux_weights * tm.template[true_pixels] * pdf_ratio/(1+pdf_ratio)
-                        #weights /= np.sum(weights)
+                        pdf_ratio_weight = self.getPDFRatioWeight(subana, sig, g)
+
+                        weights = probs * injector.flux_weights * tm.template[true_pixels] * pdf_ratio_weight
+
                         pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.dec, sig.ra + delta_ra)
                         templates[j, i, pixels] += weights
 
-        #templates[:, :, tm.template == 0] = 0
         if save:
-            np.save(fname, templates)
+            np.save(fname, np.array(templates))
         return templates
+
+    def getPDFRatioWeight(self, *args):
+        return 1.
 
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):
@@ -180,16 +190,12 @@ class Likelihood():
 
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         Ncount_av = np.zeros(Defaults.NEbin)
-        ns = WeightedNeutrinoSample()
+        ns = self.neutrino_sample_class()
         eg = self.event_generator
 
         for iteration in np.arange(N_re):
             print("iter ", iteration)
 
-            #eventmap_atm = eg.SyntheticData(0)[0]
-
-            #ns.inputCountsmap(eventmap_atm)
-            #ns.updateMask(self.idx_mask)
             trial = eg.SyntheticTrial(0)
             ns.inputTrial(trial)
             ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
@@ -203,10 +209,8 @@ class Likelihood():
         self.w_atm_std_square = self.w_atm_std ** 2
 
         if writeMap:
-            #np.savetxt(os.path.join(Defaults.NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean' + '_' + str(self.N_yr) + '.txt'),
-            #           self.w_atm_mean)
-            np.savetxt(Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr)), self.w_atm_std)
-            np.savetxt(Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr)), self.Ncount_atm)
+            np.savetxt(self.AtmSTDFname, self.w_atm_std)
+            np.savetxt(self.AtmNcountsFname, self.Ncount_atm)
 
 
     def inputData(self, ns):
@@ -271,11 +275,10 @@ class Likelihood():
             f = params
 
         w_data = self.neutrino_sample.getCrossCorrelation(self.gs.overdensityalm)
-        Ncount = self.neutrino_sample.getEventCounts()
 
         w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
         w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
-                              Ncount[self.Ebinmin : self.Ebinmax]).T
+                              self.Ncount[self.Ebinmin : self.Ebinmax]).T
         lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square / 2.
         return np.sum(lnL_le[:, self.lmin:])
 
@@ -324,24 +327,6 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(null_x)) * 2
 
-    def weighted_f_to_f(self, weighted_f, gamma):
-        """Convert weighted fraction f to unweighted f. 
-        The conversion is based on empirical scaling 
-        relation from MC and atmospheric data"""
-
-        alpha = -0.91549942
-        beta = 1.1085688
-        return weighted_f * gamma ** -alpha * np.exp(-beta)
-
-    def f_to_weighted_f(self, f, gamma):
-        """Convert weighted fraction f to unweighted f. 
-        The conversion is based on empirical scaling 
-        relation from MC and atmospheric data"""
-
-        alpha = -0.91549942
-        beta = 1.1085688
-        return f * gamma ** alpha * np.exp(beta)
-
 
     def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):
         """Generate a Test Statistic distribution for simulated trials
@@ -374,7 +359,7 @@ class Likelihood():
                 datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
                     eg_2011.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
                     eg_2012.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
-            ns = NeutrinoSample()
+            ns = self.neutrino_sample_class()
             ns.inputCountsmap(datamap)
             #ns.plotCountsmap(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Figcheck'))
             self.inputData(ns)

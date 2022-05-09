@@ -30,6 +30,7 @@ class CskyEventGenerator():
             'ana': self.ana,
             'template': density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
+            'fitter_args': dict(gamma=self.gamma),
             'sigsub': True,
             'fast_weight': True,
             'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
@@ -39,6 +40,7 @@ class CskyEventGenerator():
 
     def updateGamma(self, gamma):
         self.conf['flux'] = cy.hyp.PowerLawFlux(gamma)
+        self.conf['fitter_args'] = dict(gamma=gamma)
         self.trial_runner = cy.get_trial_runner(self.conf)
 
     def SyntheticTrial(self, ninj):
