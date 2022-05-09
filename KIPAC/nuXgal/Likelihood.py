@@ -83,7 +83,7 @@ class Likelihood():
         self.N_yr = N_yr
         self.gs = GALAXY_LIBRARY.get_sample(galaxyName)
         self.BlurredGalaxyMapFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName)
-        self.AtmSTDFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.AtmSTDFname = self.AtmSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.neutrino_sample_class = NeutrinoSample
         self.anafastMask()
@@ -170,7 +170,7 @@ class Likelihood():
                         templates[j, i, pixels] += weights
 
         if save:
-            np.save(fname, np.array(templates))
+            np.save(fname, templates)
         return templates
 
     def getPDFRatioWeight(self, *args):
