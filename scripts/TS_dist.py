@@ -16,7 +16,7 @@ import healpy as hp
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n-trials', help='Number of trials', type=int)
-    parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int)
+    parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int, nargs='+')
     parser.add_argument('-o', '--output')
     parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5, type=float)
     parser.add_argument('--compute-std', action='store_true')
@@ -24,26 +24,27 @@ def main():
     args = parser.parse_args()
     print(args.n_trials, args.output)
 
+    nrows = args.n_trials * len(args.n_inject)
     results = {
         # injection columns
-        'n_inj': np.zeros(args.n_trials),
-        'flux_inj': np.zeros(args.n_trials),
-        'gamma': np.zeros(args.n_trials),
+        'n_inj': np.zeros(nrows),
+        'flux_inj': np.zeros(nrows),
+        'gamma': np.zeros(nrows),
         # weighted nuXgal fit results
-        'weighted_f_fit': np.zeros(args.n_trials),
-        'weighted_n_fit': np.zeros(args.n_trials),
-        'weighted_TS': np.zeros(args.n_trials),
-        'weighted_flux_fit': np.zeros(args.n_trials),
+        'weighted_f_fit': np.zeros(nrows),
+        'weighted_n_fit': np.zeros(nrows),
+        'weighted_TS': np.zeros(nrows),
+        'weighted_flux_fit': np.zeros(nrows),
         # unweighted nuXgal fit results
-        'f_fit': np.zeros(args.n_trials),
-        'n_fit': np.zeros(args.n_trials),
-        'TS': np.zeros(args.n_trials),
-        'flux_fit': np.zeros(args.n_trials),
+        'f_fit': np.zeros(nrows),
+        'n_fit': np.zeros(nrows),
+        'TS': np.zeros(nrows),
+        'flux_fit': np.zeros(nrows),
         # template fit results
-        'template_n_fit': np.zeros(args.n_trials),
-        'template_TS': np.zeros(args.n_trials),
-        'template_TS': np.zeros(args.n_trials),
-        'template_flux_fit': np.zeros(args.n_trials),
+        'template_n_fit': np.zeros(nrows),
+        'template_TS': np.zeros(nrows),
+        'template_TS': np.zeros(nrows),
+        'template_flux_fit': np.zeros(nrows),
     }
 
     weighted_llh = WeightedLikelihood(10, 'WISE', args.compute_std, 0, 1, 50, gamma=args.gamma)
@@ -52,22 +53,24 @@ def main():
     eg = weighted_llh.event_generator
     eg.updateGamma(args.gamma)
 
-    for i in range(args.n_trials):
-        trial, nexc = eg.trial_runner.get_one_trial(args.n_inject)
-        results['flux_inj'][i] = eg.trial_runner.to_dNdE(args.n_inject, E0=1e5) / (4*np.pi*weighted_llh.f_sky)
-        results['gamma'][i] = args.gamma
+    for n_inject in args.n_inject:
+        for i in range(args.n_trials):
+            trial, nexc = eg.trial_runner.get_one_trial(n_inject)
+            results['n_inj'][i] = n_inject
+            results['flux_inj'][i] = eg.trial_runner.to_dNdE(n_inject, E0=1e5) / (4*np.pi*weighted_llh.f_sky)
+            results['gamma'][i] = args.gamma
 
-        weighted_results = weighted_analysis(weighted_llh, trial, args.gamma)
-        for key in weighted_results:
-            results[key][i] = weighted_results[key]
+            weighted_results = weighted_analysis(weighted_llh, trial, args.gamma)
+            for key in weighted_results:
+                results[key][i] = weighted_results[key]
 
-        unweighted_results = unweighted_analysis(unweighted_llh, trial)
-        for key in unweighted_results:
-            results[key][i] = unweighted_results[key]
+            unweighted_results = unweighted_analysis(unweighted_llh, trial)
+            for key in unweighted_results:
+                results[key][i] = unweighted_results[key]
 
-        template_results = template_analysis(trial, nexc, eg.trial_runner)
-        for key in template_results:
-            results[key][i] = template_results[key]
+            template_results = template_analysis(trial, nexc, eg.trial_runner)
+            for key in template_results:
+                results[key][i] = template_results[key]
 
     data = pd.DataFrame(results)
     data.to_csv(args.output, index=False)
