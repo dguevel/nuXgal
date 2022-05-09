@@ -53,24 +53,27 @@ def main():
     eg = weighted_llh.event_generator
     eg.updateGamma(args.gamma)
 
+    counter = 0
     for n_inject in args.n_inject:
         for i in range(args.n_trials):
             trial, nexc = eg.trial_runner.get_one_trial(n_inject)
-            results['n_inj'][i] = n_inject
-            results['flux_inj'][i] = eg.trial_runner.to_dNdE(n_inject, E0=1e5) / (4*np.pi*weighted_llh.f_sky)
-            results['gamma'][i] = args.gamma
+            results['n_inj'][counter] = n_inject
+            results['flux_inj'][counter] = eg.trial_runner.to_dNdE(n_inject, E0=1e5) / (4*np.pi*weighted_llh.f_sky)
+            results['gamma'][counter] = args.gamma
 
             weighted_results = weighted_analysis(weighted_llh, trial, args.gamma)
             for key in weighted_results:
-                results[key][i] = weighted_results[key]
+                results[key][counter] = weighted_results[key]
 
             unweighted_results = unweighted_analysis(unweighted_llh, trial)
             for key in unweighted_results:
-                results[key][i] = unweighted_results[key]
+                results[key][counter] = unweighted_results[key]
 
             template_results = template_analysis(trial, nexc, eg.trial_runner)
             for key in template_results:
-                results[key][i] = template_results[key]
+                results[key][counter] = template_results[key]
+
+            counter += 1
 
     data = pd.DataFrame(results)
     data.to_csv(args.output, index=False)
