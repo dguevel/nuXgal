@@ -60,8 +60,10 @@ def significance_from_chi(chi):
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
     BlurredGalaxyMapFname = Defaults.BLURRED_GALAXYMAP_FORMAT
+    WMeanFname = Defaults.W_MEAN_FORMAT
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
+    neutrino_sample_class = NeutrinoSample
 
     def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.):
         """C'tor
@@ -85,7 +87,7 @@ class Likelihood():
         self.BlurredGalaxyMapFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName)
         self.AtmSTDFname = self.AtmSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.neutrino_sample_class = NeutrinoSample
+        self.WMeanFname =  self.WMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.anafastMask()
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax
@@ -125,22 +127,87 @@ class Likelihood():
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
 
-    def calculate_w_mean(self, load=True, save=True):
+    def calculate_w_mean(self, load=True, save=False, ninj=1000000, niter=20):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
+        fname = self.WMeanFname
+        if load and os.path.exists(fname):
+            w_model_data = np.load(fname)
+            self.w_model_f1 = interp1d(Defaults.GAMMAS, w_model_data, axis=0)
+            return
 
-        w_model_f1 = []
-        templates = self.getTemplate(load=load, save=save)
-        for tmp in templates:
-            ns = self.neutrino_sample_class()
-            ns.inputCountsmap(tmp)
-            w_model_f1.append(ns.getCrossCorrelation(self.gs.overdensityalm))
-        self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_f1), axis=0)
+        w_model_data = []
+        ns = self.neutrino_sample_class()
+        gammas = Defaults.GAMMAS
+        for g in gammas:
+            self.event_generator.updateGamma(g)
+            #countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+            #for k in range(niter):
+            #    trial, nexc = self.event_generator.trial_runner.get_one_trial(ninj)
+            #    trial = [[tr[1],] for tr in trial]
+            #    ns.inputTrial(trial)
+            #    ns.updateCountsMap(g, self.event_generator.ana)
+            #    countsmap += ns.countsmap.copy()
+            #ns.inputCountsmap(countsmap)
+            ns = NeutrinoSample()
+            countsmap = self.getTemplate(load=load, save=save)
+            ns.inputCountsmap(countsmap)
+            w_model_data.append(ns.getCrossCorrelation(self.gs.overdensityalm))
+        w_model_data = np.array(w_model_data)
+        self.w_model_f1 = interp1d(Defaults.GAMMAS, w_model_data, axis=0)
+
+        
+        
+        #w_model_f1 = []
+        #templates = self.getTemplate(load=load, save=save)
+        #templates = self.getTemplateSamples(load=False, save=save)
+
+        #for tmp in templates:
+        #    ns = self.neutrino_sample_class()
+        #    ns.inputCountsmap(tmp)
+        #    w_model_f1.append(ns.getCrossCorrelation(self.gs.overdensityalm))
+        #self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_f1), axis=0)
+
+        if save:
+            np.save(fname, w_model_data)
+
+
+    def getTemplateSamples(self, save=True, load=True, niter=20, ninj=1000000):
+        fname = self.BlurredGalaxyMapFname
+
+        if load and os.path.exists(fname):
+            templates = np.load(fname)
+            return templates
+
+        gammas = Defaults.GAMMAS
+        eg = self.event_generator
+        templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
+
+        for j, g in enumerate(gammas):
+            eg.updateGamma(g)
+            for k in range(niter):
+                trial, nexc = eg.trial_runner.get_one_trial(ninj)
+                for i in range(Defaults.NEbin):
+                    elo = Defaults.map_logE_edge[i]
+                    ehi = Defaults.map_logE_edge[i+1]
+                    for tr, subana in zip(trial, eg.ana):
+                        evts = tr[1][(tr[1]['log10energy'] > elo) * (tr[1]['log10energy'] < ehi)]
+                        pixels = hp.ang2pix(Defaults.NSIDE, np.pi/2 - evts['dec'], evts['ra'])
+                        pdf_ratio_weight = self.getPDFRatioWeight(subana, evts, g)
+                        templates[j, i, pixels] += pdf_ratio_weight
+
+        if save:
+            np.save(fname, templates)
+        return templates
+
+
+
 
 
     def getTemplate(self, save=True, load=False):
         """Save the acceptance weighted PSF smeared template."""
+        # TODO: fix energy bin filtering
 
         fname = self.BlurredGalaxyMapFname
 

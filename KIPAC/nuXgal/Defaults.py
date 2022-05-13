@@ -46,6 +46,8 @@ GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
 GALAXYALM_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_overdensityalm.fits')
 BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_blurred_galaxymap.npy')
 WEIGHTED_BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, 'weighted_{galaxyName}_blurred_galaxymap.npy')
+W_MEAN_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, 'w_mean_{galaxyName}_{nyear}.npy')
+WEIGHTED_W_MEAN_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, 'weighted_w_mean_{galaxyName}_{nyear}.npy')
 
 GALAXYMAP_FIG_FORMAT =  os.path.join(NUXGAL_PLOT_DIR, 'test_{galaxyName}_galaxy.pdf')
 
