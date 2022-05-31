@@ -12,6 +12,7 @@ class WeightedLikelihood(Likelihood):
     AtmSTDFname = Defaults.WEIGHTED_SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.WEIGHTED_SYNTHETIC_ATM_NCOUNTS_FORMAT
     WMeanFname = Defaults.WEIGHTED_W_MEAN_FORMAT
+    IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/weighted_IC_beam.npy'
     neutrino_sample_class = WeightedNeutrinoSample
 
     def __init__(self, *args, **kwargs):
@@ -24,7 +25,7 @@ class WeightedLikelihood(Likelihood):
 
     def getPDFRatioWeight(self, subana, sig, gamma):
         pdf_ratio = subana.energy_pdf_ratio_model(sig)(gamma=gamma)[1]
-        return pdf_ratio / (1 + pdf_ratio)
+        return np.log(pdf_ratio)
 
 
     def weighted_f_to_f(self, weighted_f, gamma):
@@ -32,9 +33,14 @@ class WeightedLikelihood(Likelihood):
         The conversion is based on empirical scaling 
         relation from MC and atmospheric data"""
 
-        alpha = -0.91549942
-        beta = 1.1085688
-        return weighted_f * gamma ** -alpha * np.exp(-beta)
+        #alpha = -0.91549942
+        #beta = 1.1085688
+        #return weighted_f * gamma ** -alpha * np.exp(-beta)
+        c = 1.98250446
+        b = 2.55466937
+        a = -3.51798693
+        lgamma = np.log(gamma)
+        return weighted_f / np.exp(a*lgamma**2+b*lgamma+c)
 
     def f_to_weighted_f(self, f, gamma):
         """Convert weighted fraction f to unweighted f. 

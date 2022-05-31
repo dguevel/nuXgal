@@ -9,6 +9,7 @@ from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal.WeightedNeutrinoSample import WeightedNeutrinoSample
 from KIPAC.nuXgal.WeightedLikelihood import WeightedLikelihood
 from KIPAC.nuXgal.Likelihood import Likelihood
+from KIPAC.nuXgal import Defaults
 
 import matplotlib.pyplot as plt
 import healpy as hp
@@ -30,15 +31,19 @@ def main():
         'n_inj': np.zeros(nrows),
         'flux_inj': np.zeros(nrows),
         'gamma': np.zeros(nrows),
+        'dof': np.zeros(nrows),
         # weighted nuXgal fit results
         'weighted_f_fit': np.zeros(nrows),
         'weighted_n_fit': np.zeros(nrows),
         'weighted_TS': np.zeros(nrows),
+        'weighted_chi2': np.zeros(nrows),
         'weighted_flux_fit': np.zeros(nrows),
+        'deweighted_f_fit': np.zeros(nrows),
         # unweighted nuXgal fit results
         'f_fit': np.zeros(nrows),
         'n_fit': np.zeros(nrows),
         'TS': np.zeros(nrows),
+        'chi2': np.zeros(nrows),
         'flux_fit': np.zeros(nrows),
         # template fit results
         'template_n_fit': np.zeros(nrows),
@@ -57,6 +62,7 @@ def main():
     for n_inject in args.n_inject:
         for i in range(args.n_trials):
             trial, nexc = eg.trial_runner.get_one_trial(n_inject)
+            results['dof'] = Defaults.MAX_L-weighted_llh.lmin
             results['n_inj'][counter] = n_inject
             results['flux_inj'][counter] = eg.trial_runner.to_dNdE(n_inject, E0=1e5) / (4*np.pi*weighted_llh.f_sky)
             results['gamma'][counter] = args.gamma
@@ -65,11 +71,12 @@ def main():
             for key in weighted_results:
                 results[key][counter] = weighted_results[key]
 
-            unweighted_results = unweighted_analysis(unweighted_llh, trial)
+            unweighted_results = unweighted_analysis(unweighted_llh, trial, args.gamma)
             for key in unweighted_results:
                 results[key][counter] = unweighted_results[key]
 
             template_results = template_analysis(trial, nexc, eg.trial_runner)
+            template_results['template_flux_fit'] = eg.trial_runner.to_dNdE(template_results['template_n_fit'], E0=1e5) / (4*np.pi*weighted_llh.f_sky)
             for key in template_results:
                 results[key][counter] = template_results[key]
 
@@ -83,21 +90,26 @@ def weighted_analysis(llh, trial, gamma):
     ns.inputTrial(trial)
     llh.inputData(ns)
     ns.updateCountsMap(gamma, llh.event_generator.ana)
+    ns.updateMask(llh.idx_mask)
     result_dict = {}
     result_dict['weighted_f_fit'], result_dict['weighted_TS'] = llh.minimize__lnL()
     deweighted_f_fit = llh.weighted_f_to_f(result_dict['weighted_f_fit'], gamma)
-    result_dict['weighted_n_fit'] = llh.Ncount * deweighted_f_fit
+    result_dict['deweighted_f_fit'] = deweighted_f_fit
+    result_dict['weighted_n_fit'] = ns.getEventCounts() * deweighted_f_fit
     result_dict['weighted_flux_fit'] = llh.event_generator.trial_runner.to_dNdE(result_dict['weighted_n_fit'], E0=1e5) / (4*np.pi*llh.f_sky)
+    result_dict['weighted_chi2'] = -2*llh.log_likelihood([result_dict['weighted_f_fit']], gamma=gamma)
     return result_dict
 
-def unweighted_analysis(llh, trial):
+def unweighted_analysis(llh, trial, gamma):
     ns = NeutrinoSample()
     ns.inputTrial(trial)
+    ns.updateMask(llh.idx_mask)
     llh.inputData(ns)
     result_dict = {}
     result_dict['f_fit'], result_dict['TS'] = llh.minimize__lnL()
     result_dict['n_fit'] = result_dict['f_fit'] * llh.Ncount
     result_dict['flux_fit'] = llh.event_generator.trial_runner.to_dNdE(result_dict['n_fit'], E0=1e5) / (4*np.pi*llh.f_sky)
+    result_dict['chi2'] = -2*llh.log_likelihood([result_dict['f_fit']], gamma=gamma)
     return result_dict
 
 def template_analysis(trial, nexc, trial_runner):

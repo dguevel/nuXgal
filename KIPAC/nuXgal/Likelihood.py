@@ -16,7 +16,6 @@ from scipy.interpolate import interp1d
 from .EventGenerator import EventGenerator
 from . import Defaults
 from .NeutrinoSample import NeutrinoSample
-from .WeightedNeutrinoSample import WeightedNeutrinoSample
 from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
@@ -63,6 +62,7 @@ class Likelihood():
     WMeanFname = Defaults.W_MEAN_FORMAT
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
+    IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
 
     def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.):
@@ -94,7 +94,7 @@ class Likelihood():
         self.lmin = lmin
         # scaled mean and std
         self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, gamma=gamma)
-        self.calculate_w_mean()
+        self.calculate_w_mean(True, False)
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -127,10 +127,11 @@ class Likelihood():
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
 
-    def calculate_w_mean(self, load=True, save=False, ninj=1000000, niter=20):
+    def calculate_w_mean(self, load=False, save=True, ninj=1000000, niter=20):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
+        #load, save = False, True
         fname = self.WMeanFname
         if load and os.path.exists(fname):
             w_model_data = np.load(fname)
@@ -138,77 +139,21 @@ class Likelihood():
             return
 
         w_model_data = []
-        ns = self.neutrino_sample_class()
-        gammas = Defaults.GAMMAS
-        for g in gammas:
-            self.event_generator.updateGamma(g)
-            #countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
-            #for k in range(niter):
-            #    trial, nexc = self.event_generator.trial_runner.get_one_trial(ninj)
-            #    trial = [[tr[1],] for tr in trial]
-            #    ns.inputTrial(trial)
-            #    ns.updateCountsMap(g, self.event_generator.ana)
-            #    countsmap += ns.countsmap.copy()
-            #ns.inputCountsmap(countsmap)
-            ns = NeutrinoSample()
-            countsmap = self.getTemplate(load=load, save=save)
-            ns.inputCountsmap(countsmap)
-            w_model_data.append(ns.getCrossCorrelation(self.gs.overdensityalm))
-        w_model_data = np.array(w_model_data)
-        self.w_model_f1 = interp1d(Defaults.GAMMAS, w_model_data, axis=0)
-
-        
-        
-        #w_model_f1 = []
-        #templates = self.getTemplate(load=load, save=save)
+        templates = self.getTemplate(load=load, save=save)
         #templates = self.getTemplateSamples(load=False, save=save)
 
-        #for tmp in templates:
-        #    ns = self.neutrino_sample_class()
-        #    ns.inputCountsmap(tmp)
-        #    w_model_f1.append(ns.getCrossCorrelation(self.gs.overdensityalm))
-        #self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_f1), axis=0)
+        for tmp in templates:
+            ns = self.neutrino_sample_class()
+            ns.inputCountsmap(tmp)
+            w_model_data.append(ns.getCrossCorrelation(self.gs.overdensityalm))
+        self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_data), axis=0)
 
         if save:
             np.save(fname, w_model_data)
 
 
-    def getTemplateSamples(self, save=True, load=True, niter=20, ninj=1000000):
-        fname = self.BlurredGalaxyMapFname
-
-        if load and os.path.exists(fname):
-            templates = np.load(fname)
-            return templates
-
-        gammas = Defaults.GAMMAS
-        eg = self.event_generator
-        templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
-
-        for j, g in enumerate(gammas):
-            eg.updateGamma(g)
-            for k in range(niter):
-                trial, nexc = eg.trial_runner.get_one_trial(ninj)
-                for i in range(Defaults.NEbin):
-                    elo = Defaults.map_logE_edge[i]
-                    ehi = Defaults.map_logE_edge[i+1]
-                    for tr, subana in zip(trial, eg.ana):
-                        evts = tr[1][(tr[1]['log10energy'] > elo) * (tr[1]['log10energy'] < ehi)]
-                        pixels = hp.ang2pix(Defaults.NSIDE, np.pi/2 - evts['dec'], evts['ra'])
-                        pdf_ratio_weight = self.getPDFRatioWeight(subana, evts, g)
-                        templates[j, i, pixels] += pdf_ratio_weight
-
-        if save:
-            np.save(fname, templates)
-        return templates
-
-
-
-
-
-    def getTemplate(self, save=True, load=False):
+    def getTemplate(self, save=True, load=False, niter=10):
         """Save the acceptance weighted PSF smeared template."""
-        # TODO: fix energy bin filtering
-
         fname = self.BlurredGalaxyMapFname
 
         if load and os.path.exists(fname):
@@ -218,23 +163,36 @@ class Likelihood():
         gammas = Defaults.GAMMAS
         eg = self.event_generator
         templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
-        for j, g in enumerate(gammas):
+        for m, g in enumerate(gammas):
+            print('gamma: {}'.format(g))
             eg.updateGamma(g)
-            for i in range(Defaults.NEbin):
-                for injector, subana, probs in zip(self.event_generator.trial_runner.sig_injs, self.event_generator.ana, self.event_generator.trial_runner.sig_inj_probs):
-                    # oversample synthetic events
-                    for k in range(20):
-                        # borrowed from csky template injector
-                        sig = injector.sig
-                        tm = injector.template_model
-                        delta_ra = np.random.uniform(0, 2*np.pi, len(sig))
-                        true_pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.true_dec, sig.true_ra + delta_ra)
-                        pdf_ratio_weight = self.getPDFRatioWeight(subana, sig, g)
+            for j in range(niter):
+                print(j)
+                for i, injector in enumerate(eg.trial_runner.sig_injs):
+                    for k in range(Defaults.NEbin):
 
-                        weights = probs * injector.flux_weights * tm.template[true_pixels] * pdf_ratio_weight
+                        # scramble MC events in RA
+                        delta_ra = np.random.uniform(0, 2*np.pi, len(injector.sig))
+                        true_pixels = hp.ang2pix(Defaults.NSIDE, np.pi/2-injector.sig.true_dec, injector.sig.true_ra + delta_ra)
+                        space_weights = self.gs.density[true_pixels]/self.gs.density.sum()
+                        pixels = hp.ang2pix(Defaults.NSIDE, np.pi/2-injector.sig.dec, injector.sig.ra + delta_ra)
 
-                        pixels = hp.ang2pix(tm.nside, np.pi/2 - sig.dec, sig.ra + delta_ra)
-                        templates[j, i, pixels] += weights
+                        # filter events in the energy bin
+                        emin, emax = Defaults.map_logE_edge[k:k+2]
+                        energy_weights = (injector.sig['log10energy']>emin) * (injector.sig['log10energy']<emax)
+
+                        # weight events by astrophysical spectrum, declination, and acceptance
+                        flux_weights = injector.flux_weights
+                        dec_weights = injector.sig.dec > -5*np.pi/180
+                        acc_weights = eg.ana[i].acc_param(injector.sig, gamma=2.0)
+
+                        # apply the energy pdf weighting if applicable
+                        pdf_ratio_weight = self.getPDFRatioWeight(eg.ana[i], injector.sig, g)
+
+                        # add weighted events to template
+                        templates[m, k, pixels] += flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
+
+
 
         if save:
             np.save(fname, templates)
@@ -344,9 +302,10 @@ class Likelihood():
         w_data = self.neutrino_sample.getCrossCorrelation(self.gs.overdensityalm)
 
         w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
-        w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
-                              self.Ncount[self.Ebinmin : self.Ebinmax]).T
-        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square / 2.
+        #w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
+        #                      self.Ncount[self.Ebinmin : self.Ebinmax]).T
+        w_model_std_square = self.w_atm_std_square[self.Ebinmin : self.Ebinmax].T
+        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
         return np.sum(lnL_le[:, self.lmin:])
 
     def minimize__lnL(self):
