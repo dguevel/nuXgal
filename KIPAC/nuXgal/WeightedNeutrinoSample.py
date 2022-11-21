@@ -23,7 +23,8 @@ class WeightedNeutrinoSample(NeutrinoSample):
                     ra = np.degrees(tr['ra'][idx])
                     dec = np.degrees(tr['dec'][idx])
                     pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
-                    countsmap[i, pixels] += 1
+                    bins = np.arange(Defaults.NPIXEL+1)
+                    countsmap[i] += np.histogram(pixels, bins=bins)[0]
         self.countsmap = countsmap
 
 
@@ -39,12 +40,16 @@ class WeightedNeutrinoSample(NeutrinoSample):
                     ra = np.degrees(tr['ra'][idx])
                     dec = np.degrees(tr['dec'][idx])
                     pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
-                    #weights = pdf_ratio[idx] / (1 + pdf_ratio[idx])
-                    weights = np.log(pdf_ratio[idx])
-                    weights[weights < 0] = 0
-                    countsmap[i, pixels] += weights
+                    weights = pdf_ratio[idx] / (1 + pdf_ratio[idx])
+                    #weights = np.log(pdf_ratio[idx])
+                    #weights[weights < 0] = 0
+                    bins = np.arange(Defaults.NPIXEL+1)
+                    countsmap[i] += np.histogram(pixels, bins=bins, weights=weights)[0]
+                    #countsmap[i, pixels] += weights # TODO: this is super broken
 
-        self.countsmap = countsmap
+        self.countsmap_fullsky = countsmap.copy()
+        self.countsmap = countsmap.copy()
+
 
     def getEventCounts(self):
         return self.unweighted_countsmap.sum(axis=1)
@@ -58,4 +63,4 @@ class WeightedNeutrinoSample(NeutrinoSample):
             countsmap[i][idx_mask] = hp.UNSEEN
             unweighted_countsmap[i][idx_mask] = hp.UNSEEN
         self.countsmap = hp.ma(countsmap)
-        self.unweighted_countsmap = hp.ma(countsmap)
+        self.unweighted_countsmap = hp.ma(unweighted_countsmap)

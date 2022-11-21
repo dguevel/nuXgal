@@ -5,6 +5,7 @@ import numpy as np
 import healpy as hp
 import emcee
 import corner
+import csky as cy
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -94,7 +95,7 @@ class Likelihood():
         self.lmin = lmin
         # scaled mean and std
         self.event_generator = CskyEventGenerator(10, self.gs.density, self.gs.galaxyName, gamma=gamma)
-        self.calculate_w_mean(True, False)
+        self.calculate_w_mean(load=True, save=False)
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -127,11 +128,11 @@ class Likelihood():
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
 
-    def calculate_w_mean(self, load=False, save=True, ninj=1000000, niter=20):
+    def calculate_w_mean(self, load=True, save=False, ninj=1000000, niter=20):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
-        #load, save = False, True
+        #load, save = True, False
         fname = self.WMeanFname
         if load and os.path.exists(fname):
             w_model_data = np.load(fname)
@@ -151,8 +152,10 @@ class Likelihood():
         if save:
             np.save(fname, w_model_data)
 
+        #self.event_generator.updateGamma(self.gamma)
 
-    def getTemplate(self, save=True, load=False, niter=10):
+
+    def getTemplate(self, save=False, load=True, niter=10):
         """Save the acceptance weighted PSF smeared template."""
         fname = self.BlurredGalaxyMapFname
 
@@ -190,7 +193,11 @@ class Likelihood():
                         pdf_ratio_weight = self.getPDFRatioWeight(eg.ana[i], injector.sig, g)
 
                         # add weighted events to template
-                        templates[m, k, pixels] += flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
+                        # TODO this is broken
+                        weights = flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
+                        bins = np.arange(Defaults.NPIXEL+1)
+                        templates[m, k] += np.histogram(pixels, bins=bins, weights=weights)[0]
+                        #templates[m, k, pixels] += flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
 
 
 
@@ -254,6 +261,10 @@ class Likelihood():
         #self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.Ncount = ns.getEventCounts()
 
+        #llh_eval = [cy.llh.LLHModel(self.event_generator.ana, self.event_generator.ana[i].energy_pdf_ratio_model, sigsub=True) for i in range(len(self.event_generator.ana))]
+        #llh_eval = [self.event_generator.trial_runner.llh_models[i](self.neutrino_sample.event_list[i], 0) for i in range(len(self.event_generator.ana))]
+        #self.llh_evaluator = cy.llh.MultiLLHEvaluator(llh_eval)
+
 
     def log_likelihood_Ebin(self, f, energyBin):
         """Compute the log of the likelihood for a particular model in given energy bin
@@ -306,7 +317,10 @@ class Likelihood():
         #                      self.Ncount[self.Ebinmin : self.Ebinmax]).T
         w_model_std_square = self.w_atm_std_square[self.Ebinmin : self.Ebinmax].T
         lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
-        return np.sum(lnL_le[:, self.lmin:])
+
+        #llh_energy = -self.llh_evaluator.get_minus_llh_ratio(f*self.neutrino_sample.getEventCounts(), gamma=gamma)
+
+        return np.sum(lnL_le[:, self.lmin:])# + llh_energy
 
     def minimize__lnL(self):
         """Minimize the log-likelihood

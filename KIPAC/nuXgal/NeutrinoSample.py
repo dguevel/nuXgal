@@ -40,7 +40,8 @@ class NeutrinoSample():
                     ra = np.degrees(tr['ra'][idx])
                     dec = np.degrees(tr['dec'][idx])
                     pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
-                    countsmap[i, pixels] += 1
+                    bins = np.arange(Defaults.NPIXEL+1)
+                    countsmap[i] += np.histogram(pixels, bins=bins)[0]
         self.countsmap = countsmap
 
     def inputCountsmap(self, countsmap):

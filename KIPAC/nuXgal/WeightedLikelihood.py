@@ -25,7 +25,10 @@ class WeightedLikelihood(Likelihood):
 
     def getPDFRatioWeight(self, subana, sig, gamma):
         pdf_ratio = subana.energy_pdf_ratio_model(sig)(gamma=gamma)[1]
-        return np.log(pdf_ratio)
+        #weights = np.log(pdf_ratio)
+        #weights[weights < 0] = 0
+        #return weights
+        return pdf_ratio / (1+pdf_ratio)
 
 
     def weighted_f_to_f(self, weighted_f, gamma):
