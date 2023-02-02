@@ -40,6 +40,7 @@ NUXGAL_ANA_DIR = os.path.join(NUXGAL_DIR, 'data', 'ana')
 NCOSTHETA_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'Ncos_theta_{year}_{ebin}.txt')
 WEIGHTED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'WeightedAeff_{year}_{specIndex}_{ebin}.fits')
 TABULATED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-TabulatedAeff.txt')
+EXPOSUREMAP_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-ExposureMap.npy')
 
 ANALYTIC_CL_PATH = os.path.join(NUXGAL_ANCIL_DIR, 'Cl_ggRM.dat')
 GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
@@ -81,6 +82,12 @@ map_dlogE = np.mean(map_logE_edge[1:] - map_logE_edge[0:-1])       # Width of en
 map_E_edge = np.power(10, map_logE_edge)                           # Energy bin edges in GeV
 map_E_center = np.power(10, map_logE_center)                       # Energy bin geometric centers
 map_E_center_sq = map_E_center * map_E_center                      # Square of energy bin centers
+dlogE_micro=.05                                                    # log10(Energy) microbin size
+logE_microbin_edge = np.arange(2, 9. + dlogE_micro, dlogE_micro)   # log10(Energy) microbin edges
+
+# Sin dec bins
+dsindec = 0.05                                                     # Sin declination bin size
+sindec_bin_edge = np.arange(-1, 1. + dsindec, dsindec)             # Sin declination bin edges
 
 # Spatial binning and spherical harmonic parameters
 NPIXEL = hp.pixelfunc.nside2npix(NSIDE)    # Number of pixels
@@ -95,3 +102,4 @@ theta_north = np.radians(95.)
 idx_muon = np.where(exposuremap_theta > theta_north)
 
 GAMMAS = np.arange(1.5, 4.1, .5)
+ANALYSIS_VERSION = 'version-003-p03'
