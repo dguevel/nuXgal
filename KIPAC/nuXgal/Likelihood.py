@@ -133,6 +133,7 @@ class Likelihood():
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
         fname = self.WMeanFname
+        #load, save = False, True
         if load and os.path.exists(fname):
             w_model_data = np.load(fname)
             self.w_model_f1 = interp1d(Defaults.GAMMAS, w_model_data, axis=0)
@@ -145,6 +146,7 @@ class Likelihood():
         for tmp in templates:
             ns = self.neutrino_sample_class()
             ns.inputCountsmap(tmp)
+            ns.updateMask(self.idx_mask)
             w_model_data.append(ns.getCrossCorrelation(self.gs.overdensityalm))
         self.w_model_f1 = interp1d(Defaults.GAMMAS, np.array(w_model_data), axis=0)
 
@@ -164,7 +166,7 @@ class Likelihood():
         eg = self.event_generator
         templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
         dOmega = hp.nside2pixarea(Defaults.NSIDE)
-        exposure = Aeff(self.N_yr)
+        exposure = Aeff(str(self.N_yr))
         for m, g in enumerate(gammas):
             print('gamma: {}'.format(g))
             eg.updateGamma(g)
@@ -186,13 +188,15 @@ class Likelihood():
                         # weight events by astrophysical spectrum, declination, and acceptance
                         flux_weights = injector.flux_weights
                         dec_weights = injector.sig.dec > -5*np.pi/180
-                        acc_weights = eg.ana[i].acc_param(injector.sig, gamma=2.0)
+                        acc_weights = eg.ana[i].acc_param(injector.sig, gamma=g)
 
                         # apply the energy pdf weighting if applicable
                         pdf_ratio_weight = self.getPDFRatioWeight(eg.ana[i], injector.sig, g)
 
                         # apply conversion from counts to number flux
                         exp = exposure(injector.sig['log10energy'], injector.sig['sindec'])
+                        exp[exp == 0] = np.inf
+                        # set to inf to avoid divide by zero, this discards events with poorly characterized Aeff
                         flux_conversion_weight = 1 / dOmega / exp
 
                         # add weighted events to template
@@ -230,10 +234,10 @@ class Likelihood():
             print("iter ", iteration)
 
             trial = eg.SyntheticTrial(0)
-            ns.inputTrial(trial)
-            ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
+            ns.inputTrial(trial, str(self.N_yr))
+            ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getCrossCorrelation(self.gs.overdensityalm)
+            w_cross[iteration] = ns.getFluxCrossCorrelation(self.gs.overdensityalm)
             Ncount_av = Ncount_av + ns.getEventCounts()
 
         self.w_atm_mean = np.mean(w_cross, axis=0)
@@ -306,12 +310,12 @@ class Likelihood():
             f = params[:-1]
             gamma = params[-1]
 
-            self.neutrino_sample.updateCountsMap(gamma, self.event_generator.ana)
+            self.neutrino_sample.updateFluxMap(gamma, self.event_generator.ana)
             self.neutrino_sample.updateMask(self.idx_mask)
         else:
             f = params
 
-        w_data = self.neutrino_sample.getCrossCorrelation(self.gs.overdensityalm)
+        w_data = self.neutrino_sample.getFluxCrossCorrelation(self.gs.overdensityalm)
 
         w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
         #w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /

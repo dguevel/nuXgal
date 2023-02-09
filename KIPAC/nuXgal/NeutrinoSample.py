@@ -25,10 +25,12 @@ class NeutrinoSample():
 
 
     def inputTrial(self, trial, nyear):
+        self.exposure = Aeff(nyear)
         self.event_list = trial
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
-        self.exposure = Aeff(nyear)
+        self.fluxMap()
+        self.fluxmap_fullsky = self.fluxmap.copy()
 
     def countsMap(self):
         countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
@@ -60,9 +62,11 @@ class NeutrinoSample():
                     log10energy = tr['log10energy'][idx]
                     pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
                     exposure = self.exposure(log10energy, sindec)
-                    weights = 1 / (dOmega * exposure)
+                    # set to inf to avoid divide by zero, this discards events with poorly characterized Aeff
+                    exposure[exposure == 0] = np.inf
+                    flux_conversion_weights = 1 / dOmega / exposure # TODO: should there be a dE factor?
                     bins = np.arange(Defaults.NPIXEL+1)
-                    fluxmap[i] += np.histogram(pixels, weights=weights, bins=bins)[0]
+                    fluxmap[i] += np.histogram(pixels, weights=flux_conversion_weights, bins=bins)[0]
 
         self.fluxmap = fluxmap
 
@@ -100,9 +104,12 @@ class NeutrinoSample():
         self.idx_mask = idx_mask
         self.f_sky = 1. - len(idx_mask[0]) / float(Defaults.NPIXEL)
         countsmap = self.countsmap_fullsky.copy() + 0. # +0. to convert to float array
+        fluxmap = self.fluxmap_fullsky.copy() + 0.
         for i in range(Defaults.NEbin):
             countsmap[i][idx_mask] = hp.UNSEEN
+            fluxmap[i][idx_mask] = hp.UNSEEN
         self.countsmap = hp.ma(countsmap)
+        self.fluxmap = hp.ma(fluxmap)
 
     def getEventCounts(self):
         """Return the number of counts in each energy bin"""
@@ -123,6 +130,11 @@ class NeutrinoSample():
     def getOverdensity(self):
         """Compute and return the overdensity maps"""
         overdensity = [self.countsmap[i] / self.countsmap[i].mean() - 1. for i in range(Defaults.NEbin)]
+        return overdensity
+
+    def getFluxOverdensity(self):
+        """Compute and return the overdensity maps"""
+        overdensity = [self.fluxmap[i] / self.fluxmap[i].mean() - 1. for i in range(Defaults.NEbin)]
         return overdensity
 
     def getAlm(self):
@@ -162,6 +174,23 @@ class NeutrinoSample():
         w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
         return np.array(w_cross)
 
+    def getFluxCrossCorrelation(self, alm_g):
+        """Compute and return cross correlation between the overdensity map and a counts map
+
+        Parameters
+        ----------
+        alm_g : `np.ndarray`
+            The alm for the sample are correlating against
+
+        Returns
+        -------
+        w_cross : `np.ndarray`
+            The cross correlation
+        """
+        overdensity = self.getFluxOverdensity()
+        alm_nu = [hp.sphtfunc.map2alm(overdensity[i]) for i in range(Defaults.NEbin)]
+        w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
+        return np.array(w_cross)
 
     def plotCountsmap(self, testfigpath):
         """Plot and save the maps"""
@@ -172,6 +201,8 @@ class NeutrinoSample():
     def updateCountsMap(self, *args, **kwargs):
         pass
 
+    def updateFluxMap(self, *args, **kwargs):
+        pass
 
     #def getCrossCorrelation_countsmap(self, countsmap, overdensityMap_g, idx_mask):
     #    """Compute the cross correlation between the overdensity map and an atm counts map"""
