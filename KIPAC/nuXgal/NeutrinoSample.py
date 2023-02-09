@@ -8,7 +8,7 @@ from . import Defaults
 
 from . import file_utils
 
-from .Exposure import ICECUBE_EXPOSURE_LIBRARY
+from .Exposure import ICECUBE_EXPOSURE_LIBRARY, Aeff
 
 from .plot_utils import FigureDict
 
@@ -24,10 +24,11 @@ class NeutrinoSample():
         self.countsmap_fullsky = None
 
 
-    def inputTrial(self, trial):
+    def inputTrial(self, trial, nyear):
         self.event_list = trial
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
+        self.exposure = Aeff(nyear)
 
     def countsMap(self):
         countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
@@ -43,6 +44,27 @@ class NeutrinoSample():
                     bins = np.arange(Defaults.NPIXEL+1)
                     countsmap[i] += np.histogram(pixels, bins=bins)[0]
         self.countsmap = countsmap
+
+    def fluxMap(self):
+        fluxmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+        dOmega = hp.nside2pixarea(Defaults.NSIDE)
+        for i in range(Defaults.NEbin):
+            for evt in self.event_list:
+                for tr in evt:
+                    elo = Defaults.map_logE_edge[i]
+                    ehi = Defaults.map_logE_edge[i + 1]
+                    idx = (tr['log10energy'] > elo) * (tr['log10energy'] < ehi)
+                    ra = np.degrees(tr['ra'][idx])
+                    dec = np.degrees(tr['dec'][idx])
+                    sindec = tr['sindec'][idx]
+                    log10energy = tr['log10energy'][idx]
+                    pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
+                    exposure = self.exposure(log10energy, sindec)
+                    weights = 1 / (dOmega * exposure)
+                    bins = np.arange(Defaults.NPIXEL+1)
+                    fluxmap[i] += np.histogram(pixels, weights=weights, bins=bins)[0]
+
+        self.fluxmap = fluxmap
 
     def inputCountsmap(self, countsmap):
         """Set the counts map
@@ -116,11 +138,11 @@ class NeutrinoSample():
         return w_auto
 
 
-    #def getCrossCorrelation(self, overdensityMap_g):
-    #    """Compute the cross correlation between the overdensity map and a counts map"""
-    #    overdensity = self.getOverdensity()
-    #    w_cross = [hp.sphtfunc.anafast(overdensity[i], overdensityMap_g) / self.f_sky for i in range(Defaults.NEbin)]
-    #    return w_cross
+    def getCrossCorrelationMaps(self, overdensityMap_g):
+        """Compute the cross correlation between the overdensity map and a counts map"""
+        overdensity = self.getOverdensity()
+        w_cross = [hp.sphtfunc.anafast(overdensity[i], overdensityMap_g[i]) / self.f_sky for i in range(Defaults.NEbin)]
+        return w_cross
 
     def getCrossCorrelation(self, alm_g):
         """Compute and return cross correlation between the overdensity map and a counts map

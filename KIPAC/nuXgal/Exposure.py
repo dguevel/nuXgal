@@ -5,8 +5,29 @@ import os
 import numpy as np
 
 from . import Defaults
+from .DataSpec import ps_3yr, ps_10yr
 
 from . import file_utils
+
+class Aeff():
+    """Effective Area class"""
+    
+    def __init__(self, nyear):
+        self.nyear = nyear
+        self.aeff_matrices = self.readAeffFiles()
+
+    def __call__(self, logE, sindec):
+        """Calculate an effective area for an event with given log10(energy/GeV) and sin(declination)"""
+        logE_edges = Defaults.logE_microbin_edge
+        sindec_edges = Defaults.sindec_bin_edge
+        logE_index = np.searchsorted(logE_edges, logE) - 1
+        sindec_index = np.searchsorted(sindec_edges, sindec) - 1
+        return self.aeff_matrices[logE_index, sindec_index]
+
+    def readAeffFiles(self):
+        return np.load(Defaults.EXPOSUREMAP_FORMAT.format(year=self.nyear + 'yr'))
+
+
 
 class WeightedAeff():
     """Weighted Effective Area class

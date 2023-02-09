@@ -132,7 +132,6 @@ class Likelihood():
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
-        #load, save = True, False
         fname = self.WMeanFname
         if load and os.path.exists(fname):
             w_model_data = np.load(fname)
@@ -151,8 +150,6 @@ class Likelihood():
 
         if save:
             np.save(fname, w_model_data)
-
-        #self.event_generator.updateGamma(self.gamma)
 
 
     def getTemplate(self, save=False, load=True, niter=10):

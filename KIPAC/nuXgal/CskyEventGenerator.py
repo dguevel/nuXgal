@@ -25,7 +25,7 @@ class CskyEventGenerator():
         density_nu[Defaults.idx_muon] = 0
         self.density_nu = density_nu / density_nu.sum()
 
-        self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
+        self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
         self.conf = {
             'ana': self.ana,
             'template': density_nu.copy(),
