@@ -19,7 +19,7 @@ from . import Defaults
 from .NeutrinoSample import NeutrinoSample
 from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
-from .Exposure import ICECUBE_EXPOSURE_LIBRARY
+from .Exposure import ICECUBE_EXPOSURE_LIBRARY, Aeff
 from .CskyEventGenerator import CskyEventGenerator
 
 def significance(chi_square, dof):
@@ -163,6 +163,8 @@ class Likelihood():
         gammas = Defaults.GAMMAS
         eg = self.event_generator
         templates = np.zeros((gammas.size, Defaults.NEbin, Defaults.NPIXEL))
+        dOmega = hp.nside2pixarea(Defaults.NSIDE)
+        exposure = Aeff(self.N_yr)
         for m, g in enumerate(gammas):
             print('gamma: {}'.format(g))
             eg.updateGamma(g)
@@ -189,12 +191,14 @@ class Likelihood():
                         # apply the energy pdf weighting if applicable
                         pdf_ratio_weight = self.getPDFRatioWeight(eg.ana[i], injector.sig, g)
 
+                        # apply conversion from counts to number flux
+                        exp = exposure(injector.sig['log10energy'], injector.sig['sindec'])
+                        flux_conversion_weight = 1 / dOmega / exp
+
                         # add weighted events to template
-                        # TODO this is broken
-                        weights = flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
+                        weights = flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights * flux_conversion_weight
                         bins = np.arange(Defaults.NPIXEL+1)
                         templates[m, k] += np.histogram(pixels, bins=bins, weights=weights)[0]
-                        #templates[m, k, pixels] += flux_weights * dec_weights * pdf_ratio_weight * acc_weights * space_weights * energy_weights
 
 
 
