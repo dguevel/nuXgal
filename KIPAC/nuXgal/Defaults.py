@@ -10,8 +10,8 @@ VERBOSE = False
 
 # Fixed parameters for the Neutrino sample
 NSIDE = 128             # About 1 square degree pixels
-LOG_EMIN = 1.5          # 1000 GeV
-LOG_EMAX = 8.5          # 1e9 GeV
+LOG_EMIN = 3         # 1000 GeV
+LOG_EMAX = 6          # 1e9 GeV
 NEEdges = 2             # 8 edges, 7 bins, 1 bin per decade
 
 DT_DAYS = 333           # Length of run1
@@ -82,8 +82,8 @@ map_dlogE = np.mean(map_logE_edge[1:] - map_logE_edge[0:-1])       # Width of en
 map_E_edge = np.power(10, map_logE_edge)                           # Energy bin edges in GeV
 map_E_center = np.power(10, map_logE_center)                       # Energy bin geometric centers
 map_E_center_sq = map_E_center * map_E_center                      # Square of energy bin centers
-dlogE_micro=.05                                                    # log10(Energy) microbin size
-logE_microbin_edge = np.arange(2, 9. + dlogE_micro, dlogE_micro)   # log10(Energy) microbin edges
+dlogE_micro=3#.25#.05                                                    # log10(Energy) microbin size
+logE_microbin_edge = np.arange(LOG_EMIN, LOG_EMAX + dlogE_micro, dlogE_micro)   # log10(Energy) microbin edges
 
 # Sin dec bins
 dsindec = 0.05                                                     # Sin declination bin size
@@ -99,6 +99,7 @@ ell = np.arange(NCL)                       # Array of all l values, useful in pl
 # southern sky mask
 exposuremap_theta, exposuremap_phi = hp.pixelfunc.pix2ang(NSIDE, np.arange(NPIXEL))
 theta_north = np.radians(95.)
+#theta_north = np.radians(180)
 idx_muon = np.where(exposuremap_theta > theta_north)
 
 GAMMAS = np.arange(1.5, 4.1, .5)
