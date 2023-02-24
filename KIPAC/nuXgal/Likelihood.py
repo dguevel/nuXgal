@@ -132,6 +132,15 @@ class Likelihood():
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
         """
+
+        overdensity_g = hp.alm2map(self.gs.overdensityalm, nside=Defaults.NSIDE, verbose=False)
+        overdensity_g[self.idx_mask] = hp.UNSEEN
+        w_mean = hp.anafast(overdensity_g) / self.f_sky
+        self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
+        for i in range(Defaults.NEbin):
+            self.w_model_f1[i] = w_mean
+        return
+
         fname = self.WMeanFname
         #load, save = False, True
         if load and os.path.exists(fname):
@@ -236,8 +245,11 @@ class Likelihood():
             trial = eg.SyntheticTrial(0)
             ns.inputTrial(trial, str(self.N_yr))
             ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
+            ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getFluxCrossCorrelation(self.gs.overdensityalm)
+            self.inputData(ns)
+            w_cross[iteration] = self.w_data.copy()
+            #w_cross[iteration] = ns.getFluxCrossCorrelation(self.gs.overdensityalm)
             Ncount_av = Ncount_av + ns.getEventCounts()
 
         self.w_atm_mean = np.mean(w_cross, axis=0)
@@ -262,8 +274,20 @@ class Likelihood():
         -------
         None
         """
+
+        # smear by beaming function
+        #theta = np.radians(np.arange(0, 5.1, .1))
+        #scale = 0.006 # derived in beaming_mle.ipynb
+        #scale = 0.003
+        #beam = scale / np.power(theta**2 + scale**2, 1.5) / (2*np.pi)
+        #bl = hp.beam2bl(beam, theta, lmax=Defaults.MAX_L)
+        #overdensityalm_g = np.array([hp.almxfl(i, bl) for i in overdensityalm_g])
+
+        bl = np.load(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'beam.npy'))[0]
+
         self.neutrino_sample = ns
-        #self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
+        #self.w_data = ns.getFluxCrossCorrelation(self.gs.overdensityalm) / bl
+        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm) / bl
         self.Ncount = ns.getEventCounts()
 
         #llh_eval = [cy.llh.LLHModel(self.event_generator.ana, self.event_generator.ana[i].energy_pdf_ratio_model, sigsub=True) for i in range(len(self.event_generator.ana))]
@@ -311,13 +335,17 @@ class Likelihood():
             gamma = params[-1]
 
             self.neutrino_sample.updateFluxMap(gamma, self.event_generator.ana)
+            #self.neutrino_sample.updateCountsMap(gamma, self.event_generator.ana)
+
             self.neutrino_sample.updateMask(self.idx_mask)
         else:
             f = params
 
-        w_data = self.neutrino_sample.getFluxCrossCorrelation(self.gs.overdensityalm)
+        #w_data = self.neutrino_sample.getFluxCrossCorrelation(self.gs.overdensityalm)
+        w_data = self.w_data
 
-        w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
+        #w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
+        w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
         #w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
         #                      self.Ncount[self.Ebinmin : self.Ebinmax]).T
         w_model_std_square = self.w_atm_std_square[self.Ebinmin : self.Ebinmax].T
@@ -343,7 +371,9 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood(*args, gamma=self.gamma)
         initial = 0.5 + 0.1 * np.random.randn(len_f)
-        soln = minimize(nll, initial, bounds=[(-4, 4)] * (len_f))
+        #soln = minimize(nll, initial, bounds=[(0, np.inf)] * (len_f))
+        soln = minimize(nll, initial)
+
         return soln.x, (self.log_likelihood(soln.x, gamma=self.gamma) -\
                             self.log_likelihood(np.zeros(len_f), gamma=self.gamma)) * 2
 
