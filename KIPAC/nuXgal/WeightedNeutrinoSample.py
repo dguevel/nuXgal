@@ -2,10 +2,12 @@ import healpy as hp
 import numpy as np
 
 from . import Defaults
+from .Exposure import ICECUBE_EXPOSURE_LIBRARY, Aeff
 from .NeutrinoSample import NeutrinoSample
 
 class WeightedNeutrinoSample(NeutrinoSample):
-    def inputTrial(self, trial):
+    def inputTrial(self, trial, nyear):
+        self.exposure = Aeff(nyear)
         self.event_list = trial
         self.countsMap()
         self.unweighted_countsmap = self.countsmap.copy()
