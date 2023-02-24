@@ -7,6 +7,14 @@ import numpy as np
 from . import Defaults
 from .DataSpec import ps_3yr, ps_10yr
 
+class NullEnergyPDFRatioEvaluator(cy.pdf.EnergyPDFRatioEvaluator):
+    def __call__(self, _mask=None, **params):
+        return 1., 1.
+
+class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
+    def __call__(self, ev):
+        return NullEnergyPDFRatioEvaluator(ev, self)
+
 class CskyEventGenerator():
     def __init__(self, N_yr, density_nu, galaxyName, gamma=2, Ebinmin=0, Ebinmax=-1):
         self.galaxyName = galaxyName
@@ -25,7 +33,15 @@ class CskyEventGenerator():
         density_nu[Defaults.idx_muon] = 0
         self.density_nu = density_nu / density_nu.sum()
 
-        self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
+        # temporary fix to avoid cluster file transfer problem
+        uname = os.uname()
+        if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
+
+        else:
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
         self.conf = {
             'ana': self.ana,
             'template': density_nu.copy(),
@@ -33,8 +49,9 @@ class CskyEventGenerator():
             'fitter_args': dict(gamma=self.gamma),
             'sigsub': True,
             'fast_weight': True,
-            'dir': cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         }
+        if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
+            self.conf['dir'] = cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         self.trial_runner = cy.get_trial_runner(self.conf)
         #self.getBlurredTemplate(load=False)
 
