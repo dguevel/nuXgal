@@ -63,6 +63,7 @@ class Likelihood():
     WMeanFname = Defaults.W_MEAN_FORMAT
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
+    AtmMeanFname = Defaults.SYNTHETIC_ATM_W_MEAN_FORMAT
     IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
 
@@ -88,6 +89,7 @@ class Likelihood():
         self.BlurredGalaxyMapFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName)
         self.AtmSTDFname = self.AtmSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.AtmMeanFname = self.AtmMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.WMeanFname =  self.WMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.anafastMask()
         self.Ebinmin = Ebinmin
@@ -107,6 +109,8 @@ class Likelihood():
             w_atm_std_file = np.loadtxt(self.AtmSTDFname)
             self.w_atm_std = w_atm_std_file.reshape((Defaults.NEbin, Defaults.NCL))
             self.w_atm_std_square = self.w_atm_std ** 2
+            w_atm_mean_file = np.loadtxt(self.AtmMeanFname)
+            self.w_atm_mean = w_atm_mean_file.reshape((Defaults.NEbin, Defaults.NCL))
             self.Ncount_atm = np.loadtxt(self.AtmNcountsFname)
             self.Ncount_atm = self.Ncount_atm.reshape(Defaults.NEbin)
 
@@ -249,7 +253,6 @@ class Likelihood():
             ns.updateMask(self.idx_mask)
             self.inputData(ns)
             w_cross[iteration] = self.w_data.copy()
-            #w_cross[iteration] = ns.getFluxCrossCorrelation(self.gs.overdensityalm)
             Ncount_av = Ncount_av + ns.getEventCounts()
 
         self.w_atm_mean = np.mean(w_cross, axis=0)
@@ -260,6 +263,7 @@ class Likelihood():
         if writeMap:
             np.savetxt(self.AtmSTDFname, self.w_atm_std)
             np.savetxt(self.AtmNcountsFname, self.Ncount_atm)
+            np.savetxt(self.AtmMeanFname, self.w_atm_mean)
 
 
     def inputData(self, ns):
@@ -283,7 +287,9 @@ class Likelihood():
         #bl = hp.beam2bl(beam, theta, lmax=Defaults.MAX_L)
         #overdensityalm_g = np.array([hp.almxfl(i, bl) for i in overdensityalm_g])
 
-        bl = np.load(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'beam.npy'))[0]
+        bl = np.load(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'beam.npy'))
+        for i in range(Defaults.NEbin):
+            bl[i] = bl[i] / bl[i, 0]
 
         self.neutrino_sample = ns
         #self.w_data = ns.getFluxCrossCorrelation(self.gs.overdensityalm) / bl
@@ -341,11 +347,13 @@ class Likelihood():
         else:
             f = params
 
+        f = np.array(f)
         #w_data = self.neutrino_sample.getFluxCrossCorrelation(self.gs.overdensityalm)
         w_data = self.w_data
 
         #w_model_mean = (self.w_model_f1(gamma)[self.Ebinmin : self.Ebinmax].T * f).T
         w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
+        w_model_mean += (self.w_atm_mean[self.Ebinmin : self.Ebinmax].T * (1 - f)).T
         #w_model_std_square = (self.w_std_square0[self.Ebinmin : self.Ebinmax].T /
         #                      self.Ncount[self.Ebinmin : self.Ebinmax]).T
         w_model_std_square = self.w_atm_std_square[self.Ebinmin : self.Ebinmax].T

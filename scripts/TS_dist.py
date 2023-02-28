@@ -55,7 +55,7 @@ def main():
     }
 
     #weighted_llh = WeightedLikelihood(10, 'WISE', args.compute_std, 0, 1, 50, gamma=args.gamma)
-    unweighted_llh = Likelihood(10, 'WISE', args.compute_std, 0, 1, 50, gamma=args.gamma)
+    unweighted_llh = Likelihood(10, 'WISE', args.compute_std, 0, 3, 1, gamma=args.gamma)
     #ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, ps_10yr)
     #conf = {
     #    'ana': ana,

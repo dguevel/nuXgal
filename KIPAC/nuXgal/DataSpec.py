@@ -1,6 +1,7 @@
 import copy
 
 import csky as cy
+import numpy as np
 
 from . import Defaults
 
@@ -11,8 +12,10 @@ def restrict_energy(ds):
     elo = Defaults.map_logE_edge.min()
     ehi = Defaults.map_logE_edge.max()
 
-    sig = ds.sig[(ds.sig['log10energy'] > elo) * (ds.sig['log10energy'] < ehi)]
-    data = ds.data[(ds.data['log10energy'] > elo) * (ds.data['log10energy'] < ehi)]
+    sindec_min = np.sin(np.pi/2 - Defaults.theta_north)
+
+    sig = ds.sig[(ds.sig['log10energy'] > elo) * (ds.sig['log10energy'] < ehi) * (ds.sig['sindec'] > sindec_min)]
+    data = ds.data[(ds.data['log10energy'] > elo) * (ds.data['log10energy'] < ehi) * (ds.data['sindec'] > sindec_min)]
     return sig, data
 
 class IC40(cy.selections.PSDataSpecs.IC40):
@@ -28,6 +31,10 @@ class IC86_2011(cy.selections.PSDataSpecs.IC86_2011):
     def dataset_modifications(self, ds):
         ds.sig, ds.data = restrict_energy(ds)
 class IC86v3_2012_2017(cy.selections.PSDataSpecs.IC86v3_2012_2017):
+    def dataset_modifications(self, ds):
+        ds.sig, ds.data = restrict_energy(ds)
+
+class DNNCascade(cy.selections.DNNCascadeDataSpecs.DNNCascade_10yr):
     def dataset_modifications(self, ds):
         ds.sig, ds.data = restrict_energy(ds)
 

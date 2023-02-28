@@ -29,7 +29,9 @@ class NeutrinoSample():
         self.event_list = trial
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
-        self.fluxMap()
+        #self.fluxMap()
+        #self.fluxmap_fullsky = self.fluxmap.copy()
+        self.fluxmap = np.zeros(self.countsmap.shape)
         self.fluxmap_fullsky = self.fluxmap.copy()
 
     def countsMap(self):
@@ -48,25 +50,35 @@ class NeutrinoSample():
         self.countsmap = countsmap
 
     def fluxMap(self):
-        fluxmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+        #w_cross = [np.zeros(Defaults.MAX_L + 1) for i in range(Defaults.NEbin)]
         dOmega = hp.nside2pixarea(Defaults.NSIDE)
+        fluxmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
         for i in range(Defaults.NEbin):
             for evt in self.event_list:
-                for tr in evt:
-                    elo = Defaults.map_logE_edge[i]
-                    ehi = Defaults.map_logE_edge[i + 1]
-                    idx = (tr['log10energy'] > elo) * (tr['log10energy'] < ehi)
-                    ra = np.degrees(tr['ra'][idx])
-                    dec = np.degrees(tr['dec'][idx])
-                    sindec = tr['sindec'][idx]
-                    log10energy = tr['log10energy'][idx]
-                    pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
-                    exposure = self.exposure(log10energy, sindec)
-                    # set to inf to avoid divide by zero, this discards events with poorly characterized Aeff
-                    exposure[exposure == 0] = np.inf
-                    flux_conversion_weights = 1 / dOmega / exposure # TODO: should there be a dE factor?
-                    bins = np.arange(Defaults.NPIXEL+1)
-                    fluxmap[i] += np.histogram(pixels, weights=flux_conversion_weights, bins=bins)[0]
+                for j, (elo_micro, ehi_micro) in enumerate(zip(Defaults.logE_microbin_edge, Defaults.logE_microbin_edge[1:])):
+                    # build exposure map for this micro energy bin
+                    elo, ehi = Defaults.map_logE_edge[i], Defaults.map_logE_edge[i+1]
+                    exp_pixels = np.arange(Defaults.NPIXEL)
+                    exp_dec = np.pi/2 - hp.pix2ang(Defaults.NSIDE, exp_pixels)[0]
+                    eMid = (elo_micro+ehi_micro)/2
+                    exposuremap = self.exposure(eMid, np.sin(exp_dec))
+                    exposuremap[Defaults.idx_muon] = hp.UNSEEN
+                    exposuremap = hp.ma(exposuremap)
+
+                    # build counts map for this micro energy bin
+                    countsmap = np.zeros(Defaults.NPIXEL)
+                    for tr in evt:
+                        idx = (tr['log10energy'] > elo_micro) * (tr['log10energy'] < ehi_micro) * (tr['log10energy'] > elo) * (tr['log10energy'] < ehi)
+                        if np.sum(idx) > 0:
+                            ra = np.degrees(tr['ra'][idx])
+                            dec = np.degrees(tr['dec'][idx])
+                            pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
+                            bins = np.arange(Defaults.NPIXEL+1)
+                            countsmap += np.histogram(pixels, bins=bins)[0]
+                    #countsmap[Defaults.idx_muon] = hp.UNSEEN
+                    #countsmap = hp.ma(countsmap)
+                    fluxmap[i] += countsmap / (dOmega * exposuremap) # no need for dE if we're summing over microE
+
 
         self.fluxmap = fluxmap
 
@@ -187,6 +199,7 @@ class NeutrinoSample():
         w_cross : `np.ndarray`
             The cross correlation
         """
+
         overdensity = self.getFluxOverdensity()
         alm_nu = [hp.sphtfunc.map2alm(overdensity[i]) for i in range(Defaults.NEbin)]
         w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
