@@ -64,6 +64,7 @@ class Likelihood():
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
     AtmMeanFname = Defaults.SYNTHETIC_ATM_W_MEAN_FORMAT
+    BeamFname = Defaults.BEAM_FORMAT
     IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
 
@@ -91,6 +92,7 @@ class Likelihood():
         self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.AtmMeanFname = self.AtmMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.WMeanFname =  self.WMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.BeamFname = self.BeamFname.format(nyear=str(self.N_yr))
         self.anafastMask()
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax
@@ -101,6 +103,10 @@ class Likelihood():
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
+
+        self.bl = np.load(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'beam.npy'))
+        for i in range(Defaults.NEbin):
+            self.bl[i] = self.bl[i] / self.bl[i, 0]
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -287,13 +293,9 @@ class Likelihood():
         #bl = hp.beam2bl(beam, theta, lmax=Defaults.MAX_L)
         #overdensityalm_g = np.array([hp.almxfl(i, bl) for i in overdensityalm_g])
 
-        bl = np.load(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'beam.npy'))
-        for i in range(Defaults.NEbin):
-            bl[i] = bl[i] / bl[i, 0]
-
         self.neutrino_sample = ns
         #self.w_data = ns.getFluxCrossCorrelation(self.gs.overdensityalm) / bl
-        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm) / bl
+        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm) / self.bl
         self.Ncount = ns.getEventCounts()
 
         #llh_eval = [cy.llh.LLHModel(self.event_generator.ana, self.event_generator.ana[i].energy_pdf_ratio_model, sigsub=True) for i in range(len(self.event_generator.ana))]

@@ -42,6 +42,7 @@ WEIGHTED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'WeightedAeff_{year}_{specIn
 TABULATED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-TabulatedAeff.txt')
 EXPOSUREMAP_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-ExposureMap.npy')
 
+BEAM_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{nyear}yr-beam.npy')
 ANALYTIC_CL_PATH = os.path.join(NUXGAL_ANCIL_DIR, 'Cl_ggRM.dat')
 GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
 GALAXYALM_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_overdensityalm.fits')
