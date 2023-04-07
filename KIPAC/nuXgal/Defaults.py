@@ -45,6 +45,7 @@ EXPOSUREMAP_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-ExposureMap.npy')
 BEAM_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{nyear}yr-beam.npy')
 ANALYTIC_CL_PATH = os.path.join(NUXGAL_ANCIL_DIR, 'Cl_ggRM.dat')
 GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
+GALAXYMAP_TRUE_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap_true.fits')
 GALAXYALM_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_overdensityalm.fits')
 BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_blurred_galaxymap.npy')
 WEIGHTED_BLURRED_GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, 'weighted_{galaxyName}_blurred_galaxymap.npy')
@@ -59,6 +60,7 @@ SYNTHETIC_EVTMAP_ATM_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_a
 SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_std_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean_{galaxyName}_{nyear}.txt')
+SYNTHETIC_ASTRO_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_mean_{galaxyName}_{nyear}.txt')
 WEIGHTED_SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_w_atm_std_{galaxyName}_{nyear}.txt')
 WEIGHTED_SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 
@@ -84,11 +86,13 @@ map_dlogE = np.mean(map_logE_edge[1:] - map_logE_edge[0:-1])       # Width of en
 map_E_edge = np.power(10, map_logE_edge)                           # Energy bin edges in GeV
 map_E_center = np.power(10, map_logE_center)                       # Energy bin geometric centers
 map_E_center_sq = map_E_center * map_E_center                      # Square of energy bin centers
-dlogE_micro=0.25                                               # log10(Energy) microbin size
+#dlogE_micro=0.25                                               # log10(Energy) microbin size
+dlogE_micro = 1.
 logE_microbin_edge = np.arange(LOG_EMIN, LOG_EMAX + dlogE_micro, dlogE_micro)   # log10(Energy) microbin edges
 
 # Sin dec bins
 dsindec = 0.05                                                     # Sin declination bin size
+#dsindec = 0.1
 sindec_bin_edge = np.arange(-1, 1. + dsindec, dsindec)             # Sin declination bin edges
 
 # Spatial binning and spherical harmonic parameters
@@ -101,7 +105,10 @@ ell = np.arange(NCL)                       # Array of all l values, useful in pl
 # southern sky mask
 exposuremap_theta, exposuremap_phi = hp.pixelfunc.pix2ang(NSIDE, np.arange(NPIXEL))
 theta_north = np.radians(95.)
+#theta_north = np.radians(180.)
 idx_muon = np.where(exposuremap_theta > theta_north)
 
 GAMMAS = np.arange(1.5, 4.1, .5)
-ANALYSIS_VERSION = 'version-003-p03'
+#ANALYSIS_VERSION = 'version-003-p03'
+ANALYSIS_VERSION = 'version-004-p02'
+#ANALYSIS_VERSION = 'version-001-p02'

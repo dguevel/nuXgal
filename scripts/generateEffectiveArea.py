@@ -8,19 +8,20 @@ import csky as cy
 import healpy as hp
 import numpy as np
 
-from KIPAC.nuXgal.DataSpec import ps_3yr, ps_10yr
+from KIPAC.nuXgal.DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
 from KIPAC.nuXgal.GalaxySample import GALAXY_LIBRARY
 from KIPAC.nuXgal import Defaults
 
 def main():
     parser = argparse.ArgumentParser('Generate IceCube exposure matrix')
     parser.add_argument('--nyr', default='10')
-    parser.add_argument('--galaxy-template', default='WISE')
     args = parser.parse_args()
 
     dataspec = {
         '3': ps_3yr,
-        '10': ps_10yr
+        '10': ps_10yr,
+        'v4': ps_v4,
+        'estes_10': estes_10yr
     }
 
     # set up csky analysis which does all the bookkeeping

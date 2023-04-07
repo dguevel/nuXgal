@@ -29,9 +29,7 @@ class NeutrinoSample():
         self.event_list = trial
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
-        #self.fluxMap()
-        #self.fluxmap_fullsky = self.fluxmap.copy()
-        self.fluxmap = np.zeros(self.countsmap.shape)
+        self.fluxMap()
         self.fluxmap_fullsky = self.fluxmap.copy()
 
     def countsMap(self):
@@ -60,8 +58,10 @@ class NeutrinoSample():
                     elo, ehi = Defaults.map_logE_edge[i], Defaults.map_logE_edge[i+1]
                     exp_pixels = np.arange(Defaults.NPIXEL)
                     exp_dec = np.pi/2 - hp.pix2ang(Defaults.NSIDE, exp_pixels)[0]
-                    eMid = (elo_micro+ehi_micro)/2
-                    exposuremap = self.exposure(eMid, np.sin(exp_dec))
+                    log_eMid = (elo_micro + ehi_micro)/2
+                    eMid = (10**elo_micro + 10**ehi_micro)/2
+                    dE = 10**ehi_micro - 10**elo_micro
+                    exposuremap = self.exposure(log_eMid, np.sin(exp_dec))
                     exposuremap[Defaults.idx_muon] = hp.UNSEEN
                     exposuremap = hp.ma(exposuremap)
 
@@ -75,11 +75,11 @@ class NeutrinoSample():
                             pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
                             bins = np.arange(Defaults.NPIXEL+1)
                             countsmap += np.histogram(pixels, bins=bins)[0]
-                    #countsmap[Defaults.idx_muon] = hp.UNSEEN
-                    #countsmap = hp.ma(countsmap)
+                    #fluxmap[i] += eMid * countsmap / (dOmega * exposuremap) # no need for dE if we're summing over microE
                     fluxmap[i] += countsmap / (dOmega * exposuremap) # no need for dE if we're summing over microE
 
-
+        fluxmap[:, Defaults.idx_muon] = hp.UNSEEN
+        fluxmap = hp.ma(fluxmap)
         self.fluxmap = fluxmap
 
     def inputCountsmap(self, countsmap):

@@ -76,6 +76,22 @@ class GalaxySample_Wise(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "WISE", self.mask())
 
+class GalaxySample_Wise_nside256(GalaxySample):
+    """WISE Galaxy sample
+
+    WISE-2MASS galaxy sample map based on ~5M galaixes
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "WISE_nside256", self.mask())
+
 
 class GalaxySample_Analy(GalaxySample):
     """Galaxy sample from analytic CL
@@ -112,7 +128,7 @@ class GalaxySample_Flat(GalaxySample):
 class GalaxySampleLibrary:
     """Library of galaxy samples"""
 
-    galaxy_class_dict = {'WISE':GalaxySample_Wise, 'analy':GalaxySample_Analy,  'flat':GalaxySample_Flat}
+    galaxy_class_dict = {'WISE':GalaxySample_Wise, 'analy':GalaxySample_Analy,  'flat':GalaxySample_Flat, 'WISE_nside256': GalaxySample_Wise_nside256}
 
     def __init__(self, randomseed_galaxy=Defaults.randomseed_galaxy):
         """C'tor"""

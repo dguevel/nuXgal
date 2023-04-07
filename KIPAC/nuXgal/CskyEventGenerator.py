@@ -5,7 +5,7 @@ import healpy as hp
 import numpy as np
 
 from . import Defaults
-from .DataSpec import ps_3yr, ps_10yr
+from .DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
 
 class NullEnergyPDFRatioEvaluator(cy.pdf.EnergyPDFRatioEvaluator):
     def __call__(self, _mask=None, **params):
@@ -18,8 +18,8 @@ class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
 class CskyEventGenerator():
     def __init__(self, N_yr, density_nu, galaxyName, gamma=2, Ebinmin=0, Ebinmax=-1):
         self.galaxyName = galaxyName
-        self.npix = density_nu.size
-        self.nside = hp.npix2nside(self.npix)
+        self.npix = Defaults.NPIXEL
+        self.nside = Defaults.NSIDE
         self.ana_dir = Defaults.NUXGAL_ANA_DIR
         self.gamma = gamma
         self.emin = Defaults.map_logE_edge[Ebinmin]
@@ -27,7 +27,9 @@ class CskyEventGenerator():
 
         self.dataspec = {
             3: ps_3yr,
-            10: ps_10yr}[N_yr]
+            10: ps_10yr,
+            'v4': ps_v4,
+            'estes_10': estes_10yr}[N_yr]
 
         density_nu = density_nu.copy()
         density_nu[Defaults.idx_muon] = 0
@@ -36,17 +38,18 @@ class CskyEventGenerator():
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
+            self.ana.save(self.ana_dir)
 
         else:
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
         self.conf = {
             'ana': self.ana,
             'template': density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
-            'fitter_args': dict(gamma=self.gamma),
+            #'fitter_args': dict(gamma=self.gamma),
             'sigsub': True,
             'fast_weight': True,
         }
