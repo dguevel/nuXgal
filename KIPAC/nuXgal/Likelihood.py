@@ -6,6 +6,7 @@ import healpy as hp
 import emcee
 import corner
 import csky as cy
+import json
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -70,7 +71,7 @@ class Likelihood():
     IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.):
+    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.5):
         """C'tor
 
         Parameters
@@ -101,15 +102,13 @@ class Likelihood():
         self.Ebinmax = Ebinmax
         self.lmin = lmin
         # scaled mean and std
-        self.event_generator = CskyEventGenerator(self.N_yr, self.gs.density, self.gs.galaxyName, gamma=gamma)
+        self.event_generator = CskyEventGenerator(self.N_yr, self.gs, gamma=gamma, Ebinmin=Ebinmin, Ebinmax=Ebinmax, idx_mask=self.idx_mask)
         self.calculate_w_mean()
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
 
-        self.bl = np.load(self.BeamFname)
-        for i in range(Defaults.NEbin):
-            self.bl[i] = self.bl[i] / self.bl[i, 0]
+        self.loadSTDInterpolation()
 
         # compute or load w_atm distribution
         if computeSTD:
@@ -145,6 +144,15 @@ class Likelihood():
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
 
+    def loadSTDInterpolation(self):
+        self.std_interps = {}
+        for ebin in range(Defaults.NEbin):
+            with open('/home/dguevel/git/nuXgal/syntheticData/w_std_WISE_v4_ebin{}.json'.format(ebin)) as fp:
+                data = json.load(fp)
+
+            self.std_interps[ebin] = interp1d(data['f_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
+
+
     def calculate_w_mean(self):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
@@ -170,10 +178,8 @@ class Likelihood():
 
         for iteration in tqdm(np.arange(N_re)):
 
-            trial = eg.SyntheticTrial(1000000)
-            for tr in trial:
-                if len(tr) > 0:
-                    tr.pop(0) # remove non-signal events
+            trial, nexc = eg.SyntheticTrial(1000000, self.idx_mask, signal_only=True)
+
             ns.inputTrial(trial, str(self.N_yr))
             ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
@@ -205,7 +211,7 @@ class Likelihood():
 
         for iteration in tqdm(np.arange(N_re)):
 
-            trial = eg.SyntheticTrial(0)
+            trial, nexc = eg.SyntheticTrial(0, self.idx_mask)
             ns.inputTrial(trial, str(self.N_yr))
             ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
@@ -275,7 +281,8 @@ class Likelihood():
         w_model_mean = (self.w_model_f1[energyBin].T * f)
         w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
         #w_model_std_square = self.w_std_square0[energyBin] / self.Ncount[energyBin]
-        w_model_std_square = self.w_atm_std_square[energyBin]
+        #w_model_std_square = self.w_atm_std_square[energyBin]
+        w_model_std_square = self.std_interps[energyBin](f)**2
 
         lnL_le = - (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square / 2.
         return np.sum(lnL_le[self.lmin:])
@@ -301,11 +308,27 @@ class Likelihood():
         w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
         w_model_mean += (self.w_atm_mean[self.Ebinmin : self.Ebinmax].T * (1 - f)).T
 
-        w_model_std_square = (self.w_atm_std[self.Ebinmin : self.Ebinmax].T)**2
+        #w_model_std_square = (self.w_atm_std[self.Ebinmin : self.Ebinmax].T)**2
+        #lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
 
-        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
+        w_model_std_square = np.zeros(self.w_atm_std.shape)
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_model_std_square[ebin] = self.std_interps[ebin](f[i])**2
+
+        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square[self.Ebinmin: self.Ebinmax] / 2.
+
 
         return np.sum(lnL_le[:, self.lmin:])
+
+
+    def chi_square_Ebin(self, f, energyBin):
+        w_model_mean = (self.w_model_f1[energyBin].T * f)
+        w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
+        #w_model_std_square = self.w_atm_std_square[energyBin]
+        w_model_std_square = self.std_interps[energyBin](f)**2
+
+        chisquare = (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square
+        return np.sum(chisquare[self.lmin:])
 
 
     def log_likelihood_one_dof(self, f):

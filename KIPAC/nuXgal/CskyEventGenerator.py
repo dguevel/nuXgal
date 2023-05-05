@@ -16,14 +16,15 @@ class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
         return NullEnergyPDFRatioEvaluator(ev, self)
 
 class CskyEventGenerator():
-    def __init__(self, N_yr, density_nu, galaxyName, gamma=2, Ebinmin=0, Ebinmax=-1):
-        self.galaxyName = galaxyName
+    def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None):
+        self.galaxyName = galaxy_sample.galaxyName
         self.npix = Defaults.NPIXEL
         self.nside = Defaults.NSIDE
         self.ana_dir = Defaults.NUXGAL_ANA_DIR
         self.gamma = gamma
-        self.emin = Defaults.map_logE_edge[Ebinmin]
-        self.emax = Defaults.map_logE_edge[Ebinmax]
+        self.log_emin = Defaults.map_logE_edge[Ebinmin]
+        self.log_emax = Defaults.map_logE_edge[Ebinmax]
+        self.idx_mask = idx_mask
 
         self.dataspec = {
             3: ps_3yr,
@@ -31,9 +32,12 @@ class CskyEventGenerator():
             'v4': ps_v4,
             'estes_10': estes_10yr}[N_yr]
 
-        density_nu = density_nu.copy()
+        density_nu = galaxy_sample.density.copy()
         density_nu[Defaults.idx_muon] = 0
+        density_nu[galaxy_sample.idx_galaxymask] = 0
         self.density_nu = density_nu / density_nu.sum()
+        self.density_nu[self.density_nu.mask] = 0.
+        self.density_nu = np.array(self.density_nu)
 
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
@@ -45,9 +49,10 @@ class CskyEventGenerator():
         else:
             #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
             self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
+
         self.conf = {
             'ana': self.ana,
-            'template': density_nu.copy(),
+            'template': self.density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
             #'fitter_args': dict(gamma=self.gamma),
             'sigsub': True,
@@ -56,16 +61,71 @@ class CskyEventGenerator():
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
             self.conf['dir'] = cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
         self.trial_runner = cy.get_trial_runner(self.conf)
-        #self.getBlurredTemplate(load=False)
+        self._filter_injector_events()
+
+    def _filter_mask_events(self, trial):
+        for i, tr in enumerate(trial):
+            for j, evts in enumerate(tr):
+                pix = hp.ang2pix(Defaults.NSIDE, np.degrees(evts['ra']), np.degrees(evts['dec']), lonlat=True)
+                idx = ~np.in1d(pix, self.idx_mask) # check if events are in masked region
+                trial[i][j] = evts[idx]
+        return trial
+
+    def _filter_injector_events(self):
+        """Remove simulated and background events from csky injectors"""
+
+        for i, injector in enumerate(self.trial_runner.sig_injs):
+            sig = injector.sig
+            idx = np.ones(len(injector.sig), dtype=bool)
+
+            # energy filter
+            idx *= (sig['log10energy'] > self.log_emin) * (sig['log10energy'] < self.log_emax)
+
+            # replace signal events in place
+            self.trial_runner.sig_injs[i].flux_weights[~idx] = 0.
+
+        for i, injector in enumerate(self.trial_runner.bg_injs):
+            data = injector.data
+            idx = np.ones(len(injector.data), dtype=bool)
+
+            # no need for spatial filter since the events get RA scrambled
+            # we have to remove them in each trial
+
+            # energy filter
+            idx *= (data['log10energy'] > self.log_emin) * (data['log10energy'] < self.log_emax)
+
+            # replace signal events in place
+            self.trial_runner.bg_injs[i].data = data[idx]
 
     def updateGamma(self, gamma):
         self.conf['flux'] = cy.hyp.PowerLawFlux(gamma)
         self.conf['fitter_args'] = dict(gamma=gamma)
         self.trial_runner = cy.get_trial_runner(self.conf)
 
-    def SyntheticTrial(self, ninj):
+    def SyntheticTrial(self, ninj, keep_total_constant=True, signal_only=False):
         events, nexc = self.trial_runner.get_one_trial(ninj)
-        return events
+        events = self._filter_mask_events(events)
+
+        if keep_total_constant:
+            # we want to measure what fraction of events are astrophysical, so remove the number of events injected to hold total events fixed
+            events = self._remove_to_keep_constant(events)
+
+        if signal_only:
+            for tr in events:
+                if len(tr) > 0:
+                    tr.pop(0) # remove non-signal events
+
+        return events, nexc
+
+    def _remove_to_keep_constant(self, trial):
+        """Remove a number of atmospheric events equal to the number of signal events"""
+        for tr in trial:
+            if len(tr) == 2:
+                n_remove = len(tr[1])
+            else:
+                n_remove = 0
+            tr[0] = tr[0][n_remove:]
+        return trial
 
     def SyntheticData(self, ninj):
 

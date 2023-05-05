@@ -11,8 +11,6 @@ def restrict_energy(ds):
 
     elo = Defaults.map_logE_edge.min()
     ehi = Defaults.map_logE_edge.max()
-    #elo = 3
-    #ehi = elo + 1
 
     sindec_min = np.sin(np.pi/2 - Defaults.theta_north)
 
