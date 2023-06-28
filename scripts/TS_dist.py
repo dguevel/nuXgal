@@ -3,21 +3,17 @@ import json
 from tqdm import tqdm
 
 import numpy as np
-import pandas as pd
 
-from KIPAC.nuXgal.CskyEventGenerator import CskyEventGenerator
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
-from KIPAC.nuXgal.WeightedNeutrinoSample import WeightedNeutrinoSample
-from KIPAC.nuXgal.WeightedLikelihood import WeightedLikelihood
 from KIPAC.nuXgal.Likelihood import Likelihood
-from KIPAC.nuXgal.DataSpec import ps_10yr, ps_3yr, estes_10yr
 from KIPAC.nuXgal import Defaults
 
-import matplotlib.pyplot as plt
 import csky as cy
 import healpy as hp
 
+
 def main():
+    """Main function for executing the script."""
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n-trials', help='Number of trials', type=int)
     parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int, nargs='+')
@@ -44,7 +40,6 @@ def main():
             'ana': llh.event_generator.ana,
             'template': true_template,
             'flux': cy.hyp.PowerLawFlux(args.gamma),
-            #'fitter_args': dict(gamma=args.gamma),
             'sigsub': True,
             'fast_weight': True,
         }
@@ -97,6 +92,17 @@ def main():
 
 
 def find_n_inj_per_bin(trial, ebinmin, ebinmax):
+    """
+    Find the number of injections per energy bin.
+
+    Parameters:
+        trial (list): The trial data.
+        ebinmin (int): Minimum energy bin index.
+        ebinmax (int): Maximum energy bin index.
+
+    Returns:
+        list: The number of injections per energy bin.
+    """
     n_inj = []
     for i in range(ebinmin, ebinmax):
         elo = Defaults.map_logE_edge[i]
@@ -110,7 +116,19 @@ def find_n_inj_per_bin(trial, ebinmin, ebinmax):
 
     return n_inj
 
+
 def crosscorr_analysis(llh, trial, args):
+    """
+    Perform cross-correlation analysis.
+
+    Parameters:
+        llh (Likelihood): The Likelihood instance.
+        trial (list): The trial data.
+        args (argparse.Namespace): Parsed command-line arguments.
+
+    Returns:
+        dict: The cross-correlation analysis results.
+    """
     ns = NeutrinoSample()
     ns.inputTrial(trial, 'v4')
     ns.updateMask(llh.idx_mask)
@@ -126,12 +144,23 @@ def crosscorr_analysis(llh, trial, args):
     if args.save_cls:
         result_dict['cls'] = {}
         for ebin in range(args.ebinmin, args.ebinmax):
-
             result_dict['cls'][ebin] = llh.w_data[ebin].tolist()
 
     return result_dict
 
+
 def template_analysis(trial, nexc, trial_runner):
+    """
+    Perform template analysis.
+
+    Parameters:
+        trial (list): The trial data.
+        nexc (int): Number of excess events.
+        trial_runner: The trial runner instance.
+
+    Returns:
+        dict: The template analysis results.
+    """
     result = {}
     fit_res = trial_runner.get_one_fit_from_trial((trial, nexc))
     if len(fit_res) == 2:
