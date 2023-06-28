@@ -7,13 +7,16 @@ import numpy as np
 from . import Defaults
 from .DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
 
+
 class NullEnergyPDFRatioEvaluator(cy.pdf.EnergyPDFRatioEvaluator):
     def __call__(self, _mask=None, **params):
         return 1., 1.
 
+
 class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
     def __call__(self, ev):
         return NullEnergyPDFRatioEvaluator(ev, self)
+
 
 class CskyEventGenerator():
     def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None):
@@ -50,7 +53,6 @@ class CskyEventGenerator():
             'ana': self.ana,
             'template': self.density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
-            #'fitter_args': dict(gamma=self.gamma),
             'sigsub': True,
             'fast_weight': True,
         }
@@ -63,7 +65,7 @@ class CskyEventGenerator():
         for i, tr in enumerate(trial):
             for j, evts in enumerate(tr):
                 pix = hp.ang2pix(Defaults.NSIDE, np.degrees(evts['ra']), np.degrees(evts['dec']), lonlat=True)
-                idx = ~np.in1d(pix, self.idx_mask) # check if events are in masked region
+                idx = ~np.in1d(pix, self.idx_mask)  # check if events are in masked region
                 trial[i][j] = evts[idx]
         return trial
 
@@ -108,7 +110,7 @@ class CskyEventGenerator():
         if signal_only:
             for tr in events:
                 if len(tr) > 0:
-                    tr.pop(0) # remove non-signal events
+                    tr.pop(0)  # remove non-signal events
 
         return events, nexc
 
@@ -138,7 +140,6 @@ class CskyEventGenerator():
                     evt = cy.utils.Arrays.concatenate(evt)
                 else:
                     evt = evt[0]
-                pdf_ratio = subana.energy_pdf_ratio_model(evt)(gamma=self.gamma)[1]
                 evt_idx = (evt['log10energy'] > elo) * (evt['log10energy'] < ehi)
                 evt_subset = evt[evt_idx]
                 ra = np.degrees(evt_subset['ra'])

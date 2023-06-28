@@ -24,8 +24,9 @@ from . import Defaults
 from .NeutrinoSample import NeutrinoSample
 from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
-from .Exposure import ICECUBE_EXPOSURE_LIBRARY, Aeff
+from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
+
 
 def significance(chi_square, dof):
     """Construct an significance for a chi**2 distribution
@@ -59,7 +60,6 @@ def significance_from_chi(chi):
     chi2 = chi*chi
     dof = len(chi2)
     return significance(np.sum(chi2), dof)
-
 
 
 class Likelihood():
