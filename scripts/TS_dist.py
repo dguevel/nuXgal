@@ -8,21 +8,22 @@ from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal.Likelihood import Likelihood
 from KIPAC.nuXgal import Defaults
 
-import csky as cy
-import healpy as hp
-
 
 def main():
     """Main function for executing the script."""
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n-trials', help='Number of trials', type=int)
-    parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int, nargs='+')
+    parser.add_argument('-i', '--n-inject', 
+                        help='Number of neutrinos to inject', 
+                        type=int, nargs='+')
     parser.add_argument('-o', '--output')
-    parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5, type=float)
-    parser.add_argument('--galaxy-catalog', help='Galaxy catalog to cross correlate', choices=['WISE', 'Planck', 'unWISE_z=0.4'], default='WISE')
+    parser.add_argument('--gamma', help='Injection spectrum power law index', 
+                        default=2.5, type=float)
+    parser.add_argument('--galaxy-catalog', 
+                        help='Galaxy catalog to cross correlate', 
+                        choices=['WISE', 'Planck', 'unWISE_z=0.4'], 
+                        default='WISE')
     parser.add_argument('--compute-std', action='store_true')
-    parser.add_argument('--true-galaxies', action='store_true')
-    parser.add_argument('--do-template-bins', action='store_true', help='Do a template analysis fit in individual energy bins.')
     parser.add_argument('--ebinmin', default=0, type=int)
     parser.add_argument('--ebinmax', default=3, type=int)
     parser.add_argument('--lmin', default=50, type=int)
@@ -31,22 +32,10 @@ def main():
     parser.add_argument('--century-cube', action='store_true')
     args = parser.parse_args()
 
-    llh = Likelihood('v4', args.galaxy_catalog, args.compute_std, args.ebinmin, args.ebinmax, args.lmin, gamma=args.gamma)
+    llh = Likelihood('v4', args.galaxy_catalog, args.compute_std, args.ebinmin,
+                     args.ebinmax, args.lmin, gamma=args.gamma)
 
-    if args.true_galaxies:
-        raise NotImplementedError
-        true_template = hp.read_map(Defaults.GALAXYMAP_TRUE_FORMAT.format(galaxyName=args.galaxy_catalog))
-        conf = {
-            'ana': llh.event_generator.ana,
-            'template': true_template,
-            'flux': cy.hyp.PowerLawFlux(args.gamma),
-            'sigsub': True,
-            'fast_weight': True,
-        }
-        trial_runner = cy.get_trial_runner(conf)
-
-    else:
-        trial_runner = llh.event_generator.trial_runner
+    trial_runner = llh.event_generator.trial_runner
     eg = llh.event_generator
 
     result_list = []
