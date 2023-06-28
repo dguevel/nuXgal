@@ -25,12 +25,12 @@ class NeutrinoSample():
 
 
     def inputTrial(self, trial, nyear):
-        self.exposure = Aeff(nyear)
+        #self.exposure = Aeff(nyear)
         self.event_list = trial
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
-        self.fluxMap()
-        self.fluxmap_fullsky = self.fluxmap.copy()
+        #self.fluxMap()
+        #self.fluxmap_fullsky = self.fluxmap.copy()
 
     def countsMap(self):
         countsmap = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
@@ -116,12 +116,12 @@ class NeutrinoSample():
         self.idx_mask = idx_mask
         self.f_sky = 1. - len(idx_mask[0]) / float(Defaults.NPIXEL)
         countsmap = self.countsmap_fullsky.copy() + 0. # +0. to convert to float array
-        fluxmap = self.fluxmap_fullsky.copy() + 0.
+        #fluxmap = self.fluxmap_fullsky.copy() + 0.
         for i in range(Defaults.NEbin):
             countsmap[i][idx_mask] = hp.UNSEEN
-            fluxmap[i][idx_mask] = hp.UNSEEN
+            #fluxmap[i][idx_mask] = hp.UNSEEN
         self.countsmap = hp.ma(countsmap)
-        self.fluxmap = hp.ma(fluxmap)
+        #self.fluxmap = hp.ma(fluxmap)
 
     def getEventCounts(self):
         """Return the number of counts in each energy bin"""
@@ -184,6 +184,24 @@ class NeutrinoSample():
         overdensity = self.getOverdensity()
         alm_nu = [hp.sphtfunc.map2alm(overdensity[i]) for i in range(Defaults.NEbin)]
         w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
+        return np.array(w_cross)
+    
+    def getCrossCorrelationEbin(self, alm_g, ebin):
+        """Compute and return cross correlation between the overdensity map and a counts map for one energy bin
+
+        Parameters
+        ----------
+        alm_g : `np.ndarray`
+            The alm for the sample are correlating against
+
+        Returns
+        -------
+        w_cross : `np.ndarray`
+            The cross correlation
+        """
+        overdensity = self.getOverdensity()
+        alm_nu = hp.sphtfunc.map2alm(overdensity[ebin])
+        w_cross = hp.sphtfunc.alm2cl(alm_nu, alm_g) / self.f_sky
         return np.array(w_cross)
 
     def getFluxCrossCorrelation(self, alm_g):

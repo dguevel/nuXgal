@@ -93,7 +93,8 @@ class GalaxySample_Wise(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "WISE", self.mask())
 
-class GalaxySample_Wise_nside256(GalaxySample):
+
+class GalaxySample_unWise_z04(GalaxySample):
     """WISE Galaxy sample
 
     WISE-2MASS galaxy sample map based on ~5M galaixes
@@ -101,13 +102,69 @@ class GalaxySample_Wise_nside256(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=0.4_mask_bool.fits'), dtype=['bool']))
+        return mask
 
     def __init__(self):
         """C'tor"""
-        GalaxySample.__init__(self, "WISE_nside256", self.mask())
+        GalaxySample.__init__(self, "unWISE_z=0.4", self.mask())
+
+class GalaxySample_unWise_z06(GalaxySample):
+    """WISE Galaxy sample
+
+    WISE-2MASS galaxy sample map based on ~5M galaixes
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=0.6_mask_bool.fits'), dtype=['bool']))
+        return mask
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "unWISE_z=0.6", self.mask())
+
+class GalaxySample_unWise_z10(GalaxySample):
+    """WISE Galaxy sample
+
+    WISE-2MASS galaxy sample map based on ~5M galaixes
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=1.0_mask_bool.fits'), dtype=['bool']))
+        return mask
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "unWISE_z=1.0", self.mask())
+
+class GalaxySample_unWise_z15(GalaxySample):
+    """WISE Galaxy sample
+
+    WISE-2MASS galaxy sample map based on ~5M galaixes
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=1.5_mask_bool.fits'), dtype=['bool']))
+        return mask
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "unWISE_z=1.5", self.mask())
 
 
 class GalaxySample_Analy(GalaxySample):
@@ -145,7 +202,7 @@ class GalaxySample_Flat(GalaxySample):
 class GalaxySampleLibrary:
     """Library of galaxy samples"""
 
-    galaxy_class_dict = {'WISE':GalaxySample_Wise, 'analy':GalaxySample_Analy,  'flat':GalaxySample_Flat, 'WISE_nside256': GalaxySample_Wise_nside256, 'Planck': GalaxySample_Planck}
+    galaxy_class_dict = {'WISE':GalaxySample_Wise, 'analy':GalaxySample_Analy,  'flat':GalaxySample_Flat, 'Planck': GalaxySample_Planck, 'unWISE_z=0.4': GalaxySample_unWise_z04, 'unWISE_z=0.6': GalaxySample_unWise_z06, 'unWISE_z=1.0': GalaxySample_unWise_z10, 'unWISE_z=1.5': GalaxySample_unWise_z15}
 
     def __init__(self, randomseed_galaxy=Defaults.randomseed_galaxy):
         """C'tor"""

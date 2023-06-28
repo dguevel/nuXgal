@@ -61,6 +61,7 @@ SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_
 SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ASTRO_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_mean_{galaxyName}_{nyear}.txt')
+SYNTHETIC_ASTRO_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_std_{galaxyName}_{nyear}.txt')
 WEIGHTED_SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_w_atm_std_{galaxyName}_{nyear}.txt')
 WEIGHTED_SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 

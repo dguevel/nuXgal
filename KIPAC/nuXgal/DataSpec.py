@@ -2,6 +2,7 @@ import copy
 
 import csky as cy
 import numpy as np
+import healpy as hp
 
 from . import Defaults
 
@@ -12,10 +13,9 @@ def restrict_energy(ds):
     elo = Defaults.map_logE_edge.min()
     ehi = Defaults.map_logE_edge.max()
 
-    sindec_min = np.sin(np.pi/2 - Defaults.theta_north)
+    sig = ds.sig[(ds.sig['log10energy'] > elo) * (ds.sig['log10energy'] < ehi)]
+    data = ds.data[(ds.data['log10energy'] > elo) * (ds.data['log10energy'] < ehi)]
 
-    sig = ds.sig[(ds.sig['log10energy'] > elo) * (ds.sig['log10energy'] < ehi) * (ds.sig['sindec'] > sindec_min)]
-    data = ds.data[(ds.data['log10energy'] > elo) * (ds.data['log10energy'] < ehi) * (ds.data['sindec'] > sindec_min)]
     return sig, data
 
 class IC40(cy.selections.PSDataSpecs.IC40):

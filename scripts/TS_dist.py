@@ -1,6 +1,5 @@
 import argparse
 import json
-from copy import deepcopy
 from tqdm import tqdm
 
 import numpy as np
@@ -24,7 +23,7 @@ def main():
     parser.add_argument('-i', '--n-inject', help='Number of neutrinos to inject', type=int, nargs='+')
     parser.add_argument('-o', '--output')
     parser.add_argument('--gamma', help='Injection spectrum power law index', default=2.5, type=float)
-    parser.add_argument('--galaxy-catalog', help='Galaxy catalog to cross correlate', choices=['WISE', 'Planck'], default='WISE')
+    parser.add_argument('--galaxy-catalog', help='Galaxy catalog to cross correlate', choices=['WISE', 'Planck', 'unWISE_z=0.4'], default='WISE')
     parser.add_argument('--compute-std', action='store_true')
     parser.add_argument('--true-galaxies', action='store_true')
     parser.add_argument('--do-template-bins', action='store_true', help='Do a template analysis fit in individual energy bins.')
@@ -32,6 +31,8 @@ def main():
     parser.add_argument('--ebinmax', default=3, type=int)
     parser.add_argument('--lmin', default=50, type=int)
     parser.add_argument('--save-cls', action='store_true')
+    parser.add_argument('--bootstrap-error', default=[], nargs='+', type=int)
+    parser.add_argument('--century-cube', action='store_true')
     #parser.add_argument('--analysis', nargs='+', default=['weighted'])
     args = parser.parse_args()
 
@@ -53,15 +54,19 @@ def main():
 
     else:
         trial_runner = unweighted_llh.event_generator.trial_runner
-    #eg = weighted_llh.event_generator
     eg = unweighted_llh.event_generator
-    #eg.updateGamma(args.gamma)
 
     result_list = []
     for n_inject in args.n_inject:
         for i in tqdm(range(args.n_trials)):
             results = {}
-            trial, nexc = unweighted_llh.event_generator.SyntheticTrial(n_inject)
+            if args.century_cube:
+                trial = []
+                for i in range(10):
+                    tr, nexc = unweighted_llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
+                    trial.extend(tr)
+            else:
+                trial, nexc = unweighted_llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
             results['dof'] = Defaults.MAX_L-unweighted_llh.lmin-1
             results['n_inj'] = n_inject
             results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5) / (4*np.pi*unweighted_llh.f_sky)
@@ -80,22 +85,10 @@ def main():
             for key in unweighted_results:
                 results[key] = unweighted_results[key]
 
-            #template_results = template_analysis(trial, nexc, eg.trial_runner)
-            #template_results['template_flux_fit'] = eg.trial_runner.to_dNdE(template_results['template_n_fit'], E0=1e5) / (4*np.pi*unweighted_llh.f_sky)
-            #for key in template_results:
-            #    results[key] = template_results[key]
-
-            #if args.do_template_bins:
-            #    results['template_TS_i'] = []
-            #    results['template_n_fit_i'] = []
-            #    results['template_gamma_i'] = []
-            #    for ebin in range(Defaults.NEbin):
-            #        elo, ehi = Defaults.map_logE_edge[ebin], Defaults.map_logE_edge[ebin + 1]
-            #        ebin_trial = filter_trial(trial, elo, ehi)
-            #        template_results = template_analysis(ebin_trial, nexc, trial_runner)
-            #        results['template_TS_i'].append(template_results['template_TS'])
-            #        results['template_n_fit_i'].append(template_results['template_n_fit'])
-            #        results['template_gamma_i'].append(template_results['template_gamma'])
+            template_results = template_analysis(trial, nexc, eg.trial_runner)
+            template_results['template_flux_fit'] = eg.trial_runner.to_dNdE(template_results['template_n_fit'], E0=1e5) / (4*np.pi*unweighted_llh.f_sky)
+            for key in template_results:
+                results[key] = template_results[key]
 
             results['n_total'] = int(np.sum(unweighted_llh.Ncount))
             results['n_total_i'] = dict(zip(range(args.ebinmin, args.ebinmax), unweighted_llh.Ncount[args.ebinmin:args.ebinmax].astype(int).tolist()))
@@ -137,22 +130,11 @@ def find_n_inj_per_bin(trial, ebinmin, ebinmax):
 
     return n_inj
 
-
-def filter_trial(trial, elo, ehi):
-    new_trial = deepcopy(trial)
-    for yr in new_trial:
-        for evt in yr:
-            evt = evt[(evt['log10energy'] > elo) * (evt['log10energy'] < ehi)]
-
-    return new_trial
-            
-
-
 def unweighted_analysis(llh, trial, args):
     ns = NeutrinoSample()
     ns.inputTrial(trial, 'v4')
     ns.updateMask(llh.idx_mask)
-    llh.inputData(ns)
+    llh.inputData(ns, bootstrap_error=args.bootstrap_error)
     result_dict = {}
     #f_fit, result_dict['TS'] = llh.minimize__lnL()
     #result_dict['f_fit'] = np.sum(f_fit * llh.Ncount[llh.Ebinmin:llh.Ebinmax]) / llh.Ncount[llh.Ebinmin:llh.Ebinmax].sum()

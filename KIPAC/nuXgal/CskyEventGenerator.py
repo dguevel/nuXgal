@@ -33,22 +33,18 @@ class CskyEventGenerator():
             'estes_10': estes_10yr}[N_yr]
 
         density_nu = galaxy_sample.density.copy()
-        density_nu[Defaults.idx_muon] = 0
-        density_nu[galaxy_sample.idx_galaxymask] = 0
+        density_nu[idx_mask[0]] = hp.UNSEEN
+        density_nu = hp.ma(density_nu)
         self.density_nu = density_nu / density_nu.sum()
-        self.density_nu[self.density_nu.mask] = 0.
-        self.density_nu = np.array(self.density_nu)
 
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
             self.ana.save(self.ana_dir)
 
         else:
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, energy_pdf_ratio_model_cls=NullEnergyPDFRatioModel)
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
 
         self.conf = {
             'ana': self.ana,
@@ -104,7 +100,6 @@ class CskyEventGenerator():
 
     def SyntheticTrial(self, ninj, keep_total_constant=True, signal_only=False):
         events, nexc = self.trial_runner.get_one_trial(ninj)
-        events = self._filter_mask_events(events)
 
         if keep_total_constant:
             # we want to measure what fraction of events are astrophysical, so remove the number of events injected to hold total events fixed

@@ -7,10 +7,13 @@ import emcee
 import corner
 import csky as cy
 import json
+import itertools
+import warnings
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib
+from pandas import concat
 
 from scipy.optimize import minimize
 from scipy.stats import norm, distributions
@@ -67,6 +70,7 @@ class Likelihood():
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
     AtmMeanFname = Defaults.SYNTHETIC_ATM_W_MEAN_FORMAT
     AstroMeanFname = Defaults.SYNTHETIC_ASTRO_W_MEAN_FORMAT
+    AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     BeamFname = Defaults.BEAM_FORMAT
     IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
@@ -96,6 +100,7 @@ class Likelihood():
         self.AtmMeanFname = self.AtmMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.WMeanFname =  self.WMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.AstroMeanFname = self.AstroMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
+        self.AstroSTDFname = self.AstroSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
         self.BeamFname = self.BeamFname.format(nyear=str(self.N_yr))
         self.anafastMask()
         self.Ebinmin = Ebinmin
@@ -108,12 +113,10 @@ class Likelihood():
         self.Ncount = None
         self.gamma = gamma
 
-        self.loadSTDInterpolation()
-
         # compute or load w_atm distribution
         if computeSTD:
-            self.computeAtmophericEventDistribution(N_re=500, writeMap=True)
-            self.computeAstrophysicalEventDistribution(N_re=500, writeMap=True)
+            self.computeAtmophericEventDistribution(N_re=5000, writeMap=True)
+            self.computeAstrophysicalEventDistribution(N_re=5000, writeMap=True)
         else:
             w_atm_std_file = np.loadtxt(self.AtmSTDFname)
             self.w_atm_std = w_atm_std_file.reshape((Defaults.NEbin, Defaults.NCL))
@@ -125,10 +128,9 @@ class Likelihood():
 
             w_astro_mean_file = np.loadtxt(self.AstroMeanFname)
             self.w_model_f1 = w_astro_mean_file.reshape((Defaults.NEbin, Defaults.NCL))
+            w_astro_std_file = np.loadtxt(self.AstroSTDFname)
+            self.w_model_f1_std = w_astro_std_file.reshape((Defaults.NEbin, Defaults.NCL))
 
-        self.w_std_square0 = np.zeros((Defaults.NEbin, Defaults.NCL))
-        for i in range(Defaults.NEbin):
-            self.w_std_square0[i] = self.w_atm_std_square[i] * self.Ncount_atm[i]
 
 
     def anafastMask(self):
@@ -143,14 +145,36 @@ class Likelihood():
         self.idx_mask = np.where(mask_nu != 0)
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
+    def bootstrapSigma(self, ebin, niter=100):
+        cl = np.zeros((niter, Defaults.NCL))
+        evt = self.neutrino_sample.event_list
+        elo, ehi = Defaults.map_logE_edge[ebin], Defaults.map_logE_edge[ebin + 1]
+        flatevt = cy.utils.Events(concat([i.as_dataframe for i in itertools.chain.from_iterable(evt)]))
+        flatevt = flatevt[(flatevt['log10energy'] >= elo) * (flatevt['log10energy'] < ehi)]
+        for i in range(niter):
+            ns2 = NeutrinoSample()
+            idx = np.random.choice(len(flatevt), size=len(flatevt))
+            newevt = flatevt[idx]
+
+            ns2.inputTrial([[newevt]], 'v4')
+            ns2.updateMask(self.idx_mask)
+            # suppress invalid value warning which we get because of the energy bin filter
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                #cl[i] = ns2.getCrossCorrelation(self.gs.overdensityalm)[ebin]
+                cl[i] = ns2.getCrossCorrelationEbin(self.gs.overdensityalm, ebin)
+
+        return np.std(cl, axis=0)
 
     def loadSTDInterpolation(self):
         self.std_interps = {}
+        self.std_interps_n = {}
         for ebin in range(Defaults.NEbin):
-            with open('/home/dguevel/git/nuXgal/syntheticData/w_std_WISE_v4_ebin{}.json'.format(ebin)) as fp:
+            with open('/home/dguevel/git/nuXgal/syntheticData/w_std_unWISE_z=0.4_v4_ebin{}.json'.format(ebin)) as fp:
                 data = json.load(fp)
 
             self.std_interps[ebin] = interp1d(data['f_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
+            self.std_interps_n[ebin] = interp1d(data['n_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
 
 
     def calculate_w_mean(self):
@@ -181,16 +205,17 @@ class Likelihood():
             trial, nexc = eg.SyntheticTrial(1000000, self.idx_mask, signal_only=True)
 
             ns.inputTrial(trial, str(self.N_yr))
-            ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
-            ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateMask(self.idx_mask)
-            self.inputData(ns)
+            self.inputData(ns, bootstrap_error=[])
             w_cross[iteration] = self.w_data.copy()
 
         self.w_model_f1 = np.mean(w_cross, axis=0)
+        self.w_model_f1_std = np.std(w_cross, axis=0)
 
         if writeMap:
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
+            np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
+
 
 
     def computeAtmophericEventDistribution(self, N_re, writeMap):
@@ -216,7 +241,7 @@ class Likelihood():
             ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
             ns.updateMask(self.idx_mask)
-            self.inputData(ns)
+            self.inputData(ns, bootstrap_error=[])
             w_cross[iteration] = self.w_data.copy()
             Ncount_av = Ncount_av + ns.getEventCounts()
 
@@ -231,7 +256,7 @@ class Likelihood():
             np.savetxt(self.AtmMeanFname, self.w_atm_mean)
 
 
-    def inputData(self, ns):
+    def inputData(self, ns, bootstrap_error=[]):
         """Input data
 
         Parameters
@@ -244,23 +269,23 @@ class Likelihood():
         None
         """
 
-        # smear by beaming function
-        #theta = np.radians(np.arange(0, 5.1, .1))
-        #scale = 0.006 # derived in beaming_mle.ipynb
-        #scale = 0.003
-        #beam = scale / np.power(theta**2 + scale**2, 1.5) / (2*np.pi)
-        #bl = hp.beam2bl(beam, theta, lmax=Defaults.MAX_L)
-        #overdensityalm_g = np.array([hp.almxfl(i, bl) for i in overdensityalm_g])
-
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        #self.w_data = ns.getFluxCrossCorrelation(self.gs.overdensityalm) / self.bl
-        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)# / self.bl
+        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.Ncount = ns.getEventCounts()
 
-        #llh_eval = [cy.llh.LLHModel(self.event_generator.ana, self.event_generator.ana[i].energy_pdf_ratio_model, sigsub=True) for i in range(len(self.event_generator.ana))]
-        #llh_eval = [self.event_generator.trial_runner.llh_models[i](self.neutrino_sample.event_list[i], 0) for i in range(len(self.event_generator.ana))]
-        #self.llh_evaluator = cy.llh.MultiLLHEvaluator(llh_eval)
+        # inputData can be called on Likelihood initialization if 
+        # compute_std is True, before w_atm_std is defined
+        if hasattr(self, 'w_atm_std'):
+            self.w_std = np.copy(self.w_atm_std)
+            self.w_std_square = np.copy(self.w_atm_std_square)
+        else:
+            self.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
+            self.w_std_square = np.zeros((Defaults.NEbin, Defaults.NCL))
+
+        for ebin in bootstrap_error:
+            self.w_std[ebin] = self.bootstrapSigma(ebin)
+            self.w_std_square[ebin] = self.w_std[ebin]**2
 
 
     def log_likelihood_Ebin(self, f, energyBin):
@@ -281,8 +306,8 @@ class Likelihood():
         w_model_mean = (self.w_model_f1[energyBin].T * f)
         w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
         #w_model_std_square = self.w_std_square0[energyBin] / self.Ncount[energyBin]
-        #w_model_std_square = self.w_atm_std_square[energyBin]
-        w_model_std_square = self.std_interps[energyBin](f)**2
+        w_model_std_square = self.w_std_square[energyBin]
+        #w_model_std_square = self.std_interps[energyBin](f)**2
 
         lnL_le = - (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square / 2.
         return np.sum(lnL_le[self.lmin:])
@@ -308,14 +333,8 @@ class Likelihood():
         w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
         w_model_mean += (self.w_atm_mean[self.Ebinmin : self.Ebinmax].T * (1 - f)).T
 
-        #w_model_std_square = (self.w_atm_std[self.Ebinmin : self.Ebinmax].T)**2
-        #lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
-
-        w_model_std_square = np.zeros(self.w_atm_std.shape)
-        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
-            w_model_std_square[ebin] = self.std_interps[ebin](f[i])**2
-
-        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square[self.Ebinmin: self.Ebinmax] / 2.
+        w_model_std_square = (self.w_std[self.Ebinmin : self.Ebinmax].T)**2
+        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
 
 
         return np.sum(lnL_le[:, self.lmin:])
@@ -324,34 +343,23 @@ class Likelihood():
     def chi_square_Ebin(self, f, energyBin):
         w_model_mean = (self.w_model_f1[energyBin].T * f)
         w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
-        #w_model_std_square = self.w_atm_std_square[energyBin]
-        w_model_std_square = self.std_interps[energyBin](f)**2
+        w_model_std_square = self.w_std_square[energyBin]
 
         chisquare = (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square
         return np.sum(chisquare[self.lmin:])
 
-
-    def log_likelihood_one_dof(self, f):
-        f = np.array(f)
-        w_data = self.w_data.sum(axis=0)
-        w_model_mean = self.w_model_f1[0] * f
-        w_model_mean += np.sum(self.w_atm_mean, axis=0) * (1-f)
-        w_model_std_square = np.sum(self.w_atm_std_square, axis=0)
-        lnL_le = - (w_data - w_model_mean) ** 2 / w_model_std_square / 2.
-        return np.sum(lnL_le[self.lmin:])
-
-    def minimize__lnL_one_dof(self):
-        nll = lambda *args: -self.log_likelihood_one_dof(*args)
-        initial = 0.5
-        soln = minimize(nll, initial)
-        return soln.x, (self.log_likelihood_one_dof(soln.x) - self.log_likelihood_one_dof(0)) * 2.
-
     def minimize__lnL_analytic(self):
         len_f = self.Ebinmax - self.Ebinmin
-        f = np.sum(self.w_model_f1[self.Ebinmin:self.Ebinmax, self.lmin:] ** 2 / self.w_atm_std[self.Ebinmin:self.Ebinmax, self.lmin:] ** 2 / 2, axis=1)
-        f /= np.sum(self.w_model_f1[self.Ebinmin:self.Ebinmax, self.lmin:] * self.w_data[self.Ebinmin:self.Ebinmax, self.lmin:] / self.w_atm_std[self.Ebinmin:self.Ebinmax, self.lmin:] ** 2 / 2, axis=1)
+        f = np.zeros(len_f)
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            cgg = self.w_model_f1[ebin, self.lmin:]
+            cgnu = self.w_data[ebin, self.lmin:]
+            cgatm = self.w_atm_mean[ebin, self.lmin:]
+            cstd = self.w_std[ebin, self.lmin:]
+            f[i] = np.sum((cgg-cgatm)*(cgnu-cgatm)/cstd**2)/np.sum((cgg-cgatm)**2/cstd**2)
+            #sigma_fhat = np.sqrt(1/np.sum(((cgg-cgatm)**2)/2/cstd**2))
 
-        ts = 2*(self.log_likelihood(f, gamma=self.gamma) - self.log_likelihood(np.zeros(len_f)))
+        ts = 2*(self.log_likelihood(f) - self.log_likelihood(np.zeros(len_f)))
         return f, ts
 
 
