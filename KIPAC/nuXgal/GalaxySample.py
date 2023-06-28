@@ -1,4 +1,5 @@
-"""Contains GalaxySample class to organize galaxy samples for cross correlation"""
+"""Contains GalaxySample class to organize galaxy samples 
+for cross correlation"""
 
 
 import os
@@ -9,11 +10,7 @@ import healpy as hp
 
 import matplotlib.pyplot as plt
 
-from astropy import units as u
-from astropy.coordinates import SkyCoord
-
 from . import Defaults
-
 
 
 class GalaxySample():
@@ -43,11 +40,6 @@ class GalaxySample():
         self.idx_galaxymask = idx_galaxymask
         self.f_sky = 1. - len(self.idx_galaxymask[0]) / float(Defaults.NPIXEL)
 
-        #_galaxymap = self.galaxymap.copy()
-        #_galaxymap[self.idx_galaxymask] = hp.UNSEEN
-        #_galaxymap = hp.ma(_galaxymap)
-        #self.overdensity = _galaxymap / np.mean(_galaxymap) - 1.
-
     def plotGalaxymap(self, plotmax=100):
         """Plot galaxy counts map for a particular sample
 
@@ -57,8 +49,10 @@ class GalaxySample():
             Maximum value in the plot
         """
         hp.mollview(self.galaxymap, title=self.galaxyName, max=plotmax)
-        testfigpath = Defaults.GALAXYMAP_FIG_FORMAT.format(galaxyName=self.galaxyName)
+        testfigpath = Defaults.GALAXYMAP_FIG_FORMAT.format(
+            galaxyName=self.galaxyName)
         plt.savefig(testfigpath)
+
 
 class GalaxySample_Planck(GalaxySample):
     """Planck cosmic infrared background"""
@@ -74,6 +68,7 @@ class GalaxySample_Planck(GalaxySample):
     def __init__(self):
         """C'tor"""
         GalaxySample.__init__(self, "Planck", self.mask())
+
 
 class GalaxySample_Wise(GalaxySample):
     """WISE Galaxy sample
@@ -112,6 +107,7 @@ class GalaxySample_unWise_z04(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "unWISE_z=0.4", self.mask())
 
+
 class GalaxySample_unWise_z06(GalaxySample):
     """WISE Galaxy sample
 
@@ -130,6 +126,7 @@ class GalaxySample_unWise_z06(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "unWISE_z=0.6", self.mask())
 
+
 class GalaxySample_unWise_z10(GalaxySample):
     """WISE Galaxy sample
 
@@ -147,6 +144,7 @@ class GalaxySample_unWise_z10(GalaxySample):
     def __init__(self):
         """C'tor"""
         GalaxySample.__init__(self, "unWISE_z=1.0", self.mask())
+
 
 class GalaxySample_unWise_z15(GalaxySample):
     """WISE Galaxy sample
@@ -196,7 +194,6 @@ class GalaxySample_Flat(GalaxySample):
     def __init__(self):
         """C'tor"""
         GalaxySample.__init__("flat", self.mask())
-
 
 
 class GalaxySampleLibrary:
@@ -282,7 +279,6 @@ class GalaxySampleLibrary:
             hp.fitsfunc.write_map(analy_galaxymap_path, analy_galaxymap, overwrite=True)
             overdensityalm_path = Defaults.GALAXYALM_FORMAT.format(galaxyName='flat')
             hp.fitsfunc.write_alm(overdensityalm_path, alm, overwrite=True)
-
 
 
 GALAXY_LIBRARY = GalaxySampleLibrary(Defaults.randomseed_galaxy)
