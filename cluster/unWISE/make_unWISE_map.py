@@ -173,7 +173,6 @@ def read_template_range(files, nside, cross_match_radius=3):
                 info_dict['2mass_unwise_z_bin_filtered'].append((idx).sum().item())
 
             info_list.append(info_dict)
-            break
 
 
     return template, info_list
