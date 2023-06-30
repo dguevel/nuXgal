@@ -138,7 +138,7 @@ class Likelihood():
         with the galaxy sample mask
         """
         # mask Southern sky to avoid muons
-        mask_nu = np.zeros(Defaults.NPIXEL, dtype=np.bool)
+        mask_nu = np.zeros(Defaults.NPIXEL, dtype=bool)
         mask_nu[Defaults.idx_muon] = 1.
         # add the mask of galaxy sample
         mask_nu[self.gs.idx_galaxymask] = 1.
@@ -189,9 +189,6 @@ class Likelihood():
         for i in range(Defaults.NEbin):
             self.w_model_f1[i] = w_mean
         return
-
-    def getPDFRatioWeight(self, *args):
-        return 1.
 
     def computeAstrophysicalEventDistribution(self, N_re, writeMap):
         """Compute the cross correlation distribution for astrophysical events"""
