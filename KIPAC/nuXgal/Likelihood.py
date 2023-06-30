@@ -115,8 +115,8 @@ class Likelihood():
 
         # compute or load w_atm distribution
         if computeSTD:
-            self.computeAtmophericEventDistribution(N_re=5000, writeMap=True)
-            self.computeAstrophysicalEventDistribution(N_re=5000, writeMap=True)
+            self.computeAtmophericEventDistribution(N_re=500, writeMap=True)
+            self.computeAstrophysicalEventDistribution(N_re=500, writeMap=True)
         else:
             w_atm_std_file = np.loadtxt(self.AtmSTDFname)
             self.w_atm_std = w_atm_std_file.reshape((Defaults.NEbin, Defaults.NCL))
@@ -234,10 +234,7 @@ class Likelihood():
         for iteration in tqdm(np.arange(N_re)):
 
             trial, nexc = eg.SyntheticTrial(0, self.idx_mask)
-            ns.inputTrial(trial, str(self.N_yr))
-            ns.updateFluxMap(gamma=self.gamma, ana=self.event_generator.ana)
-            ns.updateCountsMap(gamma=self.gamma, ana=self.event_generator.ana)
-            ns.updateMask(self.idx_mask)
+            ns.inputTrial(trial)
             self.inputData(ns, bootstrap_error=[])
             w_cross[iteration] = self.w_data.copy()
             Ncount_av = Ncount_av + ns.getEventCounts()
@@ -271,7 +268,7 @@ class Likelihood():
         self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
         self.Ncount = ns.getEventCounts()
 
-        # inputData can be called on Likelihood initialization if 
+        # inputData can be called on Likelihood initialization if
         # compute_std is True, before w_atm_std is defined
         if hasattr(self, 'w_atm_std'):
             self.w_std = np.copy(self.w_atm_std)

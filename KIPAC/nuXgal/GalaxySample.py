@@ -5,7 +5,8 @@ for cross correlation"""
 import os
 
 import numpy as np
-
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 import healpy as hp
 
 import matplotlib.pyplot as plt
@@ -53,17 +54,27 @@ class GalaxySample():
             galaxyName=self.galaxyName)
         plt.savefig(testfigpath)
 
+class GalaxySample_Atmospheric(GalaxySample):
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "Atmospheric", self.mask())
+
 
 class GalaxySample_Planck(GalaxySample):
     """Planck cosmic infrared background"""
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'Planck_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
@@ -78,11 +89,9 @@ class GalaxySample_Wise(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'WISE_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
@@ -97,11 +106,9 @@ class GalaxySample_unWise_z04(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=0.4_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
@@ -116,11 +123,9 @@ class GalaxySample_unWise_z06(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=0.6_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
@@ -135,11 +140,9 @@ class GalaxySample_unWise_z10(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=1.0_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
@@ -154,11 +157,9 @@ class GalaxySample_unWise_z15(GalaxySample):
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        #c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
-        #                  dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        #return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
-        mask = np.where(~hp.read_map(os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'unWISE_z=1.5_mask_bool.fits'), dtype=['bool']))
-        return mask
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
 
     def __init__(self):
         """C'tor"""
