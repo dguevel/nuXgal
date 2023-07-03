@@ -2,8 +2,6 @@
 for cross correlation"""
 
 
-import os
-
 import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -32,14 +30,18 @@ class GalaxySample():
 
         """
         self.galaxyName = galaxyName
-        galaxymap_path = Defaults.GALAXYMAP_FORMAT.format(galaxyName=galaxyName)
-        overdensityalm_path = Defaults.GALAXYALM_FORMAT.format(galaxyName=galaxyName)
-        self.galaxymap = hp.fitsfunc.read_map(galaxymap_path, verbose=False)
-        self.galaxymap = hp.ma(self.galaxymap)
-        self.overdensityalm = hp.fitsfunc.read_alm(overdensityalm_path)
-        self.density = self.galaxymap / np.sum(self.galaxymap)
         self.idx_galaxymask = idx_galaxymask
         self.f_sky = 1. - len(self.idx_galaxymask[0]) / float(Defaults.NPIXEL)
+        galaxymap_path = Defaults.GALAXYMAP_FORMAT.format(galaxyName=galaxyName)
+        #overdensityalm_path = Defaults.GALAXYALM_FORMAT.format(galaxyName=galaxyName)
+        self.galaxymap = hp.fitsfunc.read_map(galaxymap_path, verbose=False)
+        self.galaxymap[self.idx_galaxymask] = hp.UNSEEN
+        self.galaxymap = hp.ma(self.galaxymap)
+        self.overdensity = self.galaxymap / self.galaxymap.mean() - 1.
+        #self.overdensityalm = hp.map2alm(self.overdensity, lmax=Defaults.MAX_L)
+        #self.overdensityalm = hp.fitsfunc.read_alm(overdensityalm_path)
+        self.density = self.galaxymap / np.sum(self.galaxymap)
+
 
     def plotGalaxymap(self, plotmax=100):
         """Plot galaxy counts map for a particular sample
@@ -60,7 +62,7 @@ class GalaxySample_Atmospheric(GalaxySample):
         """Contstruct and return the mask for this sample"""
         c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (c_icrs.dec.degree < -5))
 
     def __init__(self):
         """C'tor"""
@@ -108,7 +110,7 @@ class GalaxySample_unWise_z04(GalaxySample):
         """Contstruct and return the mask for this sample"""
         c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        return np.where(np.abs(c_icrs.galactic.b.degree) < 10)
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (c_icrs.dec.degree < -5))
 
     def __init__(self):
         """C'tor"""
@@ -200,7 +202,16 @@ class GalaxySample_Flat(GalaxySample):
 class GalaxySampleLibrary:
     """Library of galaxy samples"""
 
-    galaxy_class_dict = {'WISE':GalaxySample_Wise, 'analy':GalaxySample_Analy,  'flat':GalaxySample_Flat, 'Planck': GalaxySample_Planck, 'unWISE_z=0.4': GalaxySample_unWise_z04, 'unWISE_z=0.6': GalaxySample_unWise_z06, 'unWISE_z=1.0': GalaxySample_unWise_z10, 'unWISE_z=1.5': GalaxySample_unWise_z15}
+    galaxy_class_dict = {
+        'WISE': GalaxySample_Wise,
+        'analy': GalaxySample_Analy,
+        'flat': GalaxySample_Flat,
+        'Planck': GalaxySample_Planck,
+        'unWISE_z=0.4': GalaxySample_unWise_z04,
+        'unWISE_z=0.6': GalaxySample_unWise_z06,
+        'unWISE_z=1.0': GalaxySample_unWise_z10,
+        'unWISE_z=1.5': GalaxySample_unWise_z15,
+        'Atmospheric': GalaxySample_Atmospheric}
 
     def __init__(self, randomseed_galaxy=Defaults.randomseed_galaxy):
         """C'tor"""
