@@ -117,15 +117,15 @@ class NeutrinoSample():
     def getCrossCorrelationMaps(self, overdensityMap_g):
         """Compute the cross correlation between the overdensity map and a counts map"""
         overdensity = self.getOverdensity()
-        w_cross = [hp.sphtfunc.anafast(overdensity[i], overdensityMap_g[i]) / self.f_sky for i in range(Defaults.NEbin)]
+        w_cross = [hp.sphtfunc.anafast(overdensity[i], overdensityMap_g) / self.f_sky for i in range(Defaults.NEbin)]
         return w_cross
 
-    def getCrossCorrelation(self, alm_g):
+    def getCrossCorrelation(self, galaxy_sample):
         """Compute and return cross correlation between the overdensity map and a counts map
 
         Parameters
         ----------
-        alm_g : `np.ndarray`
+        galaxy_sample : `KIPAC.nuXgal.GalaxySample.GalaxySample`
             The alm for the sample are correlating against
 
         Returns
@@ -133,12 +133,15 @@ class NeutrinoSample():
         w_cross : `np.ndarray`
             The cross correlation
         """
-        overdensity = self.getOverdensity()
-        alm_nu = [hp.sphtfunc.map2alm(overdensity[i]) for i in range(Defaults.NEbin)]
-        w_cross = [hp.sphtfunc.alm2cl(alm_nu[i], alm_g) / self.f_sky for i in range(Defaults.NEbin)]
-        return np.array(w_cross)
 
-    def getCrossCorrelationEbin(self, alm_g, ebin):
+        overdensity_nu = self.getOverdensity()
+        overdensity_gal = galaxy_sample.overdensity
+        w_cross = np.zeros((Defaults.NEbin, Defaults.NCL))
+        for i in range(Defaults.NEbin):
+            w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
+        return w_cross
+
+    def getCrossCorrelationEbin(self, galaxy_sample, ebin):
         """Compute and return cross correlation between the overdensity map and a counts map for one energy bin
 
         Parameters
@@ -151,10 +154,11 @@ class NeutrinoSample():
         w_cross : `np.ndarray`
             The cross correlation
         """
-        overdensity = self.getOverdensity()
-        alm_nu = hp.sphtfunc.map2alm(overdensity[ebin])
-        w_cross = hp.sphtfunc.alm2cl(alm_nu, alm_g) / self.f_sky
-        return np.array(w_cross)
+
+        overdensity_nu = self.getOverdensity()
+        overdensity_gal = galaxy_sample.overdensity
+        w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
+        return w_cross
 
     def plotCountsmap(self, testfigpath):
         """Plot and save the maps"""
