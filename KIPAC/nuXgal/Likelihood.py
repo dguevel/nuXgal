@@ -9,6 +9,7 @@ import csky as cy
 import json
 import itertools
 import warnings
+from copy import copy
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -108,14 +109,13 @@ class Likelihood():
         self.lmin = lmin
         # scaled mean and std
         self.event_generator = CskyEventGenerator(self.N_yr, self.gs, gamma=gamma, Ebinmin=Ebinmin, Ebinmax=Ebinmax, idx_mask=self.idx_mask)
-        self.calculate_w_mean()
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
 
         # compute or load w_atm distribution
         if computeSTD:
-            self.computeAtmophericEventDistribution(N_re=500, writeMap=True)
+            self.computeAtmosphericEventDistribution(N_re=500, writeMap=True)
             self.computeAstrophysicalEventDistribution(N_re=500, writeMap=True)
         else:
             w_atm_std_file = np.loadtxt(self.AtmSTDFname)
@@ -156,13 +156,13 @@ class Likelihood():
             idx = np.random.choice(len(flatevt), size=len(flatevt))
             newevt = flatevt[idx]
 
-            ns2.inputTrial([[newevt]], 'v4')
+            ns2.inputTrial([[newevt]])
             ns2.updateMask(self.idx_mask)
             # suppress invalid value warning which we get because of the energy bin filter
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 #cl[i] = ns2.getCrossCorrelation(self.gs.overdensityalm)[ebin]
-                cl[i] = ns2.getCrossCorrelationEbin(self.gs.overdensityalm, ebin)
+                cl[i] = ns2.getCrossCorrelationEbin(self.gs, ebin)
 
         return np.std(cl, axis=0)
 
@@ -214,8 +214,47 @@ class Likelihood():
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
 
+    def computeAtmosphericEventDistribution(self, N_re, writeMap):
+        """Compute the cross correlation distribution for Atmopheric event
 
-    def computeAtmophericEventDistribution(self, N_re, writeMap):
+        Parameters
+        ----------
+        N_re : `int`
+           Number of realizations to use to compute the models
+        writeMap : `bool`
+           If true, save the distributions
+        """
+
+        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
+        Ncount_av = np.zeros(Defaults.NEbin)
+        ns = self.neutrino_sample_class()
+        atm_gs = GALAXY_LIBRARY.get_sample('Atmospheric')
+        eg = CskyEventGenerator(self.N_yr,
+                                atm_gs,
+                                gamma=self.gamma,
+                                Ebinmin=self.Ebinmin,
+                                Ebinmax=self.Ebinmax,
+                                idx_mask=self.idx_mask)
+
+        for iteration in tqdm(np.arange(N_re)):
+
+            trial, nexc = eg.SyntheticTrial(1000000, self.idx_mask, signal_only=True)
+            ns.inputTrial(trial)
+            self.inputData(ns, bootstrap_error=[])
+            w_cross[iteration] = self.w_data.copy()
+            Ncount_av = Ncount_av + ns.getEventCounts()
+
+        self.w_atm_mean = np.mean(w_cross, axis=0)
+        self.w_atm_std = np.std(w_cross, axis=0)
+        self.Ncount_atm = Ncount_av / float(N_re)
+        self.w_atm_std_square = self.w_atm_std ** 2
+
+        if writeMap:
+            np.savetxt(self.AtmSTDFname, self.w_atm_std)
+            np.savetxt(self.AtmNcountsFname, self.Ncount_atm)
+            np.savetxt(self.AtmMeanFname, self.w_atm_mean)
+
+    def computeAtmosphericEventDistribution_old(self, N_re, writeMap):
         """Compute the cross correlation distribution for Atmopheric event
 
         Parameters
@@ -250,7 +289,7 @@ class Likelihood():
             np.savetxt(self.AtmMeanFname, self.w_atm_mean)
 
 
-    def inputData(self, ns, bootstrap_error=[]):
+    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100):
         """Input data
 
         Parameters
@@ -265,7 +304,7 @@ class Likelihood():
 
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        self.w_data = ns.getCrossCorrelation(self.gs.overdensityalm)
+        self.w_data = ns.getCrossCorrelation(self.gs)
         self.Ncount = ns.getEventCounts()
 
         # inputData can be called on Likelihood initialization if
@@ -278,7 +317,7 @@ class Likelihood():
             self.w_std_square = np.zeros((Defaults.NEbin, Defaults.NCL))
 
         for ebin in bootstrap_error:
-            self.w_std[ebin] = self.bootstrapSigma(ebin)
+            self.w_std[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
 
