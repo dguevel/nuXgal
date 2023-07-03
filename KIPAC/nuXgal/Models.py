@@ -47,8 +47,8 @@ class Model(object):
         atm_std_exists = os.path.exists(self.w_atm_std_fname)
         files_exist = mean_exists and std_exists and atm_std_exists
         if recompute or not files_exist:
-            self.calc_w_mean(N_re=10)
-            self.calc_w_atm_std(N_re=10)
+            self.calc_w_mean(N_re=500)
+            self.calc_w_atm_std(N_re=500)
             if save_model:
                 self.save_model()
         else:
