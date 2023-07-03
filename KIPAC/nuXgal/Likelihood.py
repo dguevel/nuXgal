@@ -9,7 +9,8 @@ import csky as cy
 import json
 import itertools
 import warnings
-from copy import copy
+from multiprocessing import Pool
+
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -27,6 +28,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
+from .Models import TemplateSignalModel, TemplateBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -64,19 +66,17 @@ def significance_from_chi(chi):
 
 
 class Likelihood():
-    """Class to evaluate the likelihood for a particular model of neutrino galaxy correlation"""
-    BlurredGalaxyMapFname = Defaults.BLURRED_GALAXYMAP_FORMAT
+    """Class to evaluate the likelihood for a particular model of neutrino 
+    galaxy correlation"""
     WMeanFname = Defaults.W_MEAN_FORMAT
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
     AtmNcountsFname = Defaults.SYNTHETIC_ATM_NCOUNTS_FORMAT
     AtmMeanFname = Defaults.SYNTHETIC_ATM_W_MEAN_FORMAT
     AstroMeanFname = Defaults.SYNTHETIC_ASTRO_W_MEAN_FORMAT
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
-    BeamFname = Defaults.BEAM_FORMAT
-    IC_BEAM = '/Users/dguevel/git/nuXgal/data/ancil/IC_beam.npy'
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, computeSTD, Ebinmin, Ebinmax, lmin, gamma=2.5):
+    def __init__(self, N_yr, galaxyName, background_model, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False):
         """C'tor
 
         Parameters
@@ -95,14 +95,6 @@ class Likelihood():
 
         self.N_yr = N_yr
         self.gs = GALAXY_LIBRARY.get_sample(galaxyName)
-        self.BlurredGalaxyMapFname = self.BlurredGalaxyMapFname.format(galaxyName=self.gs.galaxyName)
-        self.AtmSTDFname = self.AtmSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.AtmNcountsFname = self.AtmNcountsFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.AtmMeanFname = self.AtmMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.WMeanFname =  self.WMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.AstroMeanFname = self.AstroMeanFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.AstroSTDFname = self.AstroSTDFname.format(galaxyName=self.gs.galaxyName, nyear= str(self.N_yr))
-        self.BeamFname = self.BeamFname.format(nyear=str(self.N_yr))
         self.anafastMask()
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax
@@ -113,24 +105,25 @@ class Likelihood():
         self.Ncount = None
         self.gamma = gamma
 
-        # compute or load w_atm distribution
-        if computeSTD:
-            self.computeAtmosphericEventDistribution(N_re=500, writeMap=True)
-            self.computeAstrophysicalEventDistribution(N_re=500, writeMap=True)
-        else:
-            w_atm_std_file = np.loadtxt(self.AtmSTDFname)
-            self.w_atm_std = w_atm_std_file.reshape((Defaults.NEbin, Defaults.NCL))
-            self.w_atm_std_square = self.w_atm_std ** 2
-            w_atm_mean_file = np.loadtxt(self.AtmMeanFname)
-            self.w_atm_mean = w_atm_mean_file.reshape((Defaults.NEbin, Defaults.NCL))
-            self.Ncount_atm = np.loadtxt(self.AtmNcountsFname)
-            self.Ncount_atm = self.Ncount_atm.reshape(Defaults.NEbin)
+        # load signal model
+        self.signal_model = TemplateSignalModel(
+            self.gs,
+            self.N_yr,
+            self.idx_mask,
+            recompute=recompute_model)
 
-            w_astro_mean_file = np.loadtxt(self.AstroMeanFname)
-            self.w_model_f1 = w_astro_mean_file.reshape((Defaults.NEbin, Defaults.NCL))
-            w_astro_std_file = np.loadtxt(self.AstroSTDFname)
-            self.w_model_f1_std = w_astro_std_file.reshape((Defaults.NEbin, Defaults.NCL))
+        # load background model
+        atm_gs = GALAXY_LIBRARY.get_sample('Atmospheric')
+        self.background_model = TemplateBackgroundModel(
+            atm_gs,
+            self.N_yr,
+            self.idx_mask,
+            recompute=recompute_model)
 
+        self.w_atm_mean = self.background_model.w_mean
+        self.w_model_f1 = self.signal_model.w_mean
+        self.w_atm_std = self.background_model.w_atm_std
+        self.w_atm_std_square = self.w_atm_std ** 2
 
 
     def anafastMask(self):
@@ -145,24 +138,22 @@ class Likelihood():
         self.idx_mask = np.where(mask_nu != 0)
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
-    def bootstrapSigma(self, ebin, niter=100):
+    def bootstrapSigma(self, ebin, niter=100, mp_cpus=8):
         cl = np.zeros((niter, Defaults.NCL))
         evt = self.neutrino_sample.event_list
         elo, ehi = Defaults.map_logE_edge[ebin], Defaults.map_logE_edge[ebin + 1]
         flatevt = cy.utils.Events(concat([i.as_dataframe for i in itertools.chain.from_iterable(evt)]))
         flatevt = flatevt[(flatevt['log10energy'] >= elo) * (flatevt['log10energy'] < ehi)]
-        for i in range(niter):
-            ns2 = NeutrinoSample()
-            idx = np.random.choice(len(flatevt), size=len(flatevt))
-            newevt = flatevt[idx]
+        galaxy_sample = self.gs
+        idx_mask = self.idx_mask
 
-            ns2.inputTrial([[newevt]])
-            ns2.updateMask(self.idx_mask)
-            # suppress invalid value warning which we get because of the energy bin filter
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                #cl[i] = ns2.getCrossCorrelation(self.gs.overdensityalm)[ebin]
-                cl[i] = ns2.getCrossCorrelationEbin(self.gs, ebin)
+        if mp_cpus > 1:
+            p = Pool(mp_cpus)
+            iterables = ((flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter))
+            cl = p.starmap(bootstrap_worker, iterables)
+        else:
+            cl = [bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter)]
+        cl = np.array(cl)
 
         return np.std(cl, axis=0)
 
@@ -213,82 +204,6 @@ class Likelihood():
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
-
-    def computeAtmosphericEventDistribution(self, N_re, writeMap):
-        """Compute the cross correlation distribution for Atmopheric event
-
-        Parameters
-        ----------
-        N_re : `int`
-           Number of realizations to use to compute the models
-        writeMap : `bool`
-           If true, save the distributions
-        """
-
-        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
-        Ncount_av = np.zeros(Defaults.NEbin)
-        ns = self.neutrino_sample_class()
-        atm_gs = GALAXY_LIBRARY.get_sample('Atmospheric')
-        eg = CskyEventGenerator(self.N_yr,
-                                atm_gs,
-                                gamma=self.gamma,
-                                Ebinmin=self.Ebinmin,
-                                Ebinmax=self.Ebinmax,
-                                idx_mask=self.idx_mask)
-
-        for iteration in tqdm(np.arange(N_re)):
-
-            trial, nexc = eg.SyntheticTrial(1000000, self.idx_mask, signal_only=True)
-            ns.inputTrial(trial)
-            self.inputData(ns, bootstrap_error=[])
-            w_cross[iteration] = self.w_data.copy()
-            Ncount_av = Ncount_av + ns.getEventCounts()
-
-        self.w_atm_mean = np.mean(w_cross, axis=0)
-        self.w_atm_std = np.std(w_cross, axis=0)
-        self.Ncount_atm = Ncount_av / float(N_re)
-        self.w_atm_std_square = self.w_atm_std ** 2
-
-        if writeMap:
-            np.savetxt(self.AtmSTDFname, self.w_atm_std)
-            np.savetxt(self.AtmNcountsFname, self.Ncount_atm)
-            np.savetxt(self.AtmMeanFname, self.w_atm_mean)
-
-    def computeAtmosphericEventDistribution_old(self, N_re, writeMap):
-        """Compute the cross correlation distribution for Atmopheric event
-
-        Parameters
-        ----------
-        N_re : `int`
-           Number of realizations to use to compute the models
-        writeMap : `bool`
-           If true, save the distributions
-        """
-
-        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
-        Ncount_av = np.zeros(Defaults.NEbin)
-        ns = self.neutrino_sample_class()
-        eg = self.event_generator
-
-        for iteration in tqdm(np.arange(N_re)):
-
-            trial, nexc = eg.SyntheticTrial(0, self.idx_mask)
-            ns.inputTrial(trial)
-            self.inputData(ns, bootstrap_error=[])
-            w_cross[iteration] = self.w_data.copy()
-            Ncount_av = Ncount_av + ns.getEventCounts()
-
-        self.w_atm_mean = np.mean(w_cross, axis=0)
-        self.w_atm_std = np.std(w_cross, axis=0)
-        self.Ncount_atm = Ncount_av / float(N_re)
-        self.w_atm_std_square = self.w_atm_std ** 2
-
-        if writeMap:
-            np.savetxt(self.AtmSTDFname, self.w_atm_std)
-            np.savetxt(self.AtmNcountsFname, self.Ncount_atm)
-            np.savetxt(self.AtmMeanFname, self.w_atm_mean)
-
-
     def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100):
         """Input data
 
@@ -307,14 +222,8 @@ class Likelihood():
         self.w_data = ns.getCrossCorrelation(self.gs)
         self.Ncount = ns.getEventCounts()
 
-        # inputData can be called on Likelihood initialization if
-        # compute_std is True, before w_atm_std is defined
-        if hasattr(self, 'w_atm_std'):
-            self.w_std = np.copy(self.w_atm_std)
-            self.w_std_square = np.copy(self.w_atm_std_square)
-        else:
-            self.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
-            self.w_std_square = np.zeros((Defaults.NEbin, Defaults.NCL))
+        self.w_std = np.copy(self.w_atm_std)
+        self.w_std_square = np.copy(self.w_atm_std_square)
 
         for ebin in bootstrap_error:
             self.w_std[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter)
@@ -679,3 +588,18 @@ class Likelihood():
         #print(flat_samples.shape)
         fig = corner.corner(flat_samples, labels=labels, truths=truths)
         fig.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_MCMCcorner.pdf'))
+
+
+def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
+
+    ns2 = NeutrinoSample()
+    idx = np.random.choice(len(flatevt), size=len(flatevt))
+    newevt = flatevt[idx]
+
+    ns2.inputTrial([[newevt]])
+    ns2.updateMask(idx_mask)
+    # suppress invalid value warning which we get because of the energy bin filter
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin)
+    return cl

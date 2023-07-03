@@ -32,8 +32,15 @@ def main():
     parser.add_argument('--century-cube', action='store_true')
     args = parser.parse_args()
 
-    llh = Likelihood('v4', args.galaxy_catalog, args.compute_std, args.ebinmin,
-                     args.ebinmax, args.lmin, gamma=args.gamma)
+    llh = Likelihood(
+        'v4',
+        galaxyName=args.galaxy_catalog,
+        background_model='Template',
+        recompute_model=args.compute_std,
+        Ebinmin=args.ebinmin,
+        Ebinmax=args.ebinmax,
+        lmin=args.lmin,
+        gamma=args.gamma)
 
     trial_runner = llh.event_generator.trial_runner
     eg = llh.event_generator
@@ -119,7 +126,7 @@ def crosscorr_analysis(llh, trial, args):
         dict: The cross-correlation analysis results.
     """
     ns = NeutrinoSample()
-    ns.inputTrial(trial, 'v4')
+    ns.inputTrial(trial)
     ns.updateMask(llh.idx_mask)
     llh.inputData(ns, bootstrap_error=args.bootstrap_error)
     result_dict = {}
