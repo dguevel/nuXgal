@@ -152,7 +152,9 @@ class Likelihood():
             iterables = ((flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter))
             cl = p.starmap(bootstrap_worker, iterables)
         else:
-            cl = [bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter)]
+            cl = np.zeros((niter, Defaults.NCL))
+            for i in tqdm(range(niter)):
+                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin)
         cl = np.array(cl)
 
         return np.std(cl, axis=0)
@@ -204,7 +206,7 @@ class Likelihood():
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
-    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100):
+    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100, mp_cpus=8):
         """Input data
 
         Parameters
@@ -226,7 +228,7 @@ class Likelihood():
         self.w_std_square = np.copy(self.w_atm_std_square)
 
         for ebin in bootstrap_error:
-            self.w_std[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter)
+            self.w_std[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
 
