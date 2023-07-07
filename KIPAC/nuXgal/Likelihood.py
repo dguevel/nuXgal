@@ -28,7 +28,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import TemplateSignalModel, TemplateBackgroundModel
+from .Models import TemplateSignalModel, DataHistogramBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -76,7 +76,7 @@ class Likelihood():
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, background_model, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False):
         """C'tor
 
         Parameters
@@ -100,7 +100,13 @@ class Likelihood():
         self.Ebinmax = Ebinmax
         self.lmin = lmin
         # scaled mean and std
-        self.event_generator = CskyEventGenerator(self.N_yr, self.gs, gamma=gamma, Ebinmin=Ebinmin, Ebinmax=Ebinmax, idx_mask=self.idx_mask)
+        self.event_generator = CskyEventGenerator(
+            self.N_yr,
+            self.gs,
+            gamma=gamma,
+            Ebinmin=Ebinmin,
+            Ebinmax=Ebinmax,
+            idx_mask=self.idx_mask)
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -113,16 +119,16 @@ class Likelihood():
             recompute=recompute_model)
 
         # load background model
-        atm_gs = GALAXY_LIBRARY.get_sample('Atmospheric')
-        self.background_model = TemplateBackgroundModel(
-            atm_gs,
+        self.background_model = DataHistogramBackgroundModel(
+            self.gs,
             self.N_yr,
             self.idx_mask,
             recompute=recompute_model)
 
         self.w_atm_mean = self.background_model.w_mean
         self.w_model_f1 = self.signal_model.w_mean
-        self.w_atm_std = self.background_model.w_atm_std
+        #self.w_atm_std = self.background_model.w_atm_std
+        self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
 
@@ -138,7 +144,7 @@ class Likelihood():
         self.idx_mask = np.where(mask_nu != 0)
         self.f_sky = 1. - len(self.idx_mask[0]) / float(Defaults.NPIXEL)
 
-    def bootstrapSigma(self, ebin, niter=100, mp_cpus=8):
+    def bootstrapSigma(self, ebin, niter=100, mp_cpus=1):
         cl = np.zeros((niter, Defaults.NCL))
         evt = self.neutrino_sample.event_list
         elo, ehi = Defaults.map_logE_edge[ebin], Defaults.map_logE_edge[ebin + 1]
@@ -206,7 +212,7 @@ class Likelihood():
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
-    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100, mp_cpus=8):
+    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100, mp_cpus=1):
         """Input data
 
         Parameters
@@ -226,9 +232,10 @@ class Likelihood():
 
         self.w_std = np.copy(self.w_atm_std)
         self.w_std_square = np.copy(self.w_atm_std_square)
+        self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL)))
 
         for ebin in bootstrap_error:
-            self.w_std[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
+            self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
 

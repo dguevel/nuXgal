@@ -5,9 +5,12 @@ import os
 from . import Defaults
 from .CskyEventGenerator import CskyEventGenerator
 from .NeutrinoSample import NeutrinoSample
+from .DataSpec import ps_v4
 
+import csky as cy
 import numpy as np
 from tqdm import tqdm
+import scipy
 
 
 class Model(object):
@@ -32,23 +35,23 @@ class Model(object):
         # define filenames
         self.w_mean_fname = Defaults.SYNTHETIC_W_MEAN_FORMAT.format(
             galaxyName=self.name,
-            nyear=self.N_yr)
+            nyear=self.N_yr,
+            method=self.method_type)
         self.w_std_fname = Defaults.SYNTHETIC_W_STD_FORMAT.format(
             galaxyName=self.name,
-            nyear=self.N_yr)
-        self.w_atm_std_fname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
-        self.w_atm_std_fname = self.w_atm_std_fname.format(
-            galaxyName=self.name,
-            nyear=self.N_yr)
+            nyear=self.N_yr,
+            method=self.method_type)
+        #self.w_atm_std_fname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
+        #self.w_atm_std_fname = self.w_atm_std_fname.format(
+        #    galaxyName=self.name,
+        #    nyear=self.N_yr)
 
         # try to load model from file if it exists
         mean_exists = os.path.exists(self.w_mean_fname)
         std_exists = os.path.exists(self.w_std_fname)
-        atm_std_exists = os.path.exists(self.w_atm_std_fname)
-        files_exist = mean_exists and std_exists and atm_std_exists
+        files_exist = mean_exists and std_exists
         if recompute or not files_exist:
             self.calc_w_mean(N_re=500)
-            self.calc_w_atm_std(N_re=500)
             if save_model:
                 self.save_model()
         else:
@@ -63,12 +66,10 @@ class Model(object):
     def save_model(self):
         np.save(self.w_mean_fname, self.w_mean)
         np.save(self.w_std_fname, self.w_std)
-        np.save(self.w_atm_std_fname, self.w_atm_std)
 
     def load_model(self):
         self.w_mean = np.load(self.w_mean_fname)
         self.w_std = np.load(self.w_std_fname)
-        self.w_atm_std = np.load(self.w_atm_std_fname)
 
     def get_event_generator(self):
         if not hasattr(self, 'event_generator'):
@@ -82,6 +83,7 @@ class Model(object):
 
         return self.event_generator
 
+    '''
     def calc_w_atm_std(self, N_re=500):
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         ns = NeutrinoSample()
@@ -97,9 +99,11 @@ class Model(object):
         self.w_atm_trials = w_cross.copy()
         self.w_atm_mean = np.mean(w_cross, axis=0)
         self.w_atm_std = np.std(w_cross, axis=0)
+    '''
 
 
 class TemplateModel(Model):
+    method_type = 'template'
 
     def calc_w_mean(self, N_re=500):
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
@@ -129,7 +133,101 @@ class TemplateBackgroundModel(TemplateModel):
 
 
 class DataScrambleBackgroundModel(Model):
+    method_type = 'data_scramble'
     def __init__(self):
         raise NotImplementedError(
             'DataScrambleBackgroundModel not implemented yet')
     gamma = 2.5
+
+
+class DataHistogramBackgroundModel(Model):
+    method_type = 'data_histogram'
+    _bins = np.arange(-1, 1.1, 0.1)
+
+    def _load_events(self):
+        events = []
+
+        path_list = []
+        for spec in ps_v4:
+            spec = spec()
+            if not isinstance(spec.path_data, str):
+                path_list.extend(spec.path_data)
+            else:
+                path_list.append(spec.path_data)
+
+        for path in path_list:
+            path = os.path.join(
+                cy.selections.Repository.remote_root, 
+                path)
+            path = path.format(version=Defaults.ANALYSIS_VERSION)
+            evt = cy.utils.Arrays(np.load(path))
+            events.append(evt)
+
+        events = cy.utils.Arrays.concatenate(events)
+        return events
+
+    def _calc_events_per_ebin(self, events):
+        events_per_ebin = [0 for i in range(Defaults.NEbin)]
+        for ebin in range(Defaults.NEbin):
+            idx = events['log10energy'] >= Defaults.map_logE_edge[ebin]
+            idx *= events['log10energy'] < Defaults.map_logE_edge[ebin+1]
+            events_per_ebin[ebin] += np.sum(idx)
+        return events_per_ebin
+
+    def _generate_synthetic_trial(self):
+        # randomly choose event dec bin weighted by histogram
+        probs = self.hist / self.hist.sum()
+
+        events_list = []
+
+        for ebin in range(Defaults.NEbin):
+            sindec_bin_idx = np.random.choice(
+                len(self.hist),
+                p=probs,
+                size=self.events_per_ebin[ebin])
+
+            sindec = self.bin_center[sindec_bin_idx]
+            events = cy.utils.Arrays({'sindec': sindec})
+
+            # assign uniform random RA
+            events['ra'] = np.random.uniform(0, 2*np.pi, len(events))
+
+            # assign uniform random sin(Dec) within bin
+            dsindec = (self._bins[1] - self._bins[0]) / 2
+            events['sindec'] += np.random.uniform(-dsindec, dsindec, len(events))
+            events['dec'] = np.arcsin(events['sindec'])
+
+            # assign uniform random energy within log energy bin
+            events['log10energy'] = np.random.uniform(
+                Defaults.map_logE_edge[ebin],
+                Defaults.map_logE_edge[ebin+1],
+                len(events))
+            events_list.append(events)
+        return [[cy.utils.Arrays.concatenate(events_list)]]
+
+    def _make_histogram(self):
+        self.events = self._load_events()
+        self.events['log10energy'] = self.events['logE']
+        self.events_per_ebin = self._calc_events_per_ebin(self.events)
+
+        hist, bins = np.histogram(
+            np.sin(self.events['dec']),
+            bins=self._bins)
+        self.hist = hist
+        self.bin_center = (bins[1:] + bins[:-1]) / 2
+
+    def calc_w_mean(self, N_re=500):
+        self._make_histogram()
+        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
+        ns = NeutrinoSample()
+
+        for iteration in tqdm(np.arange(N_re)):
+
+            trial = self._generate_synthetic_trial()
+            ns.inputTrial(trial)
+            ns.updateMask(self.idx_mask)
+            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+
+        self.w_trials = w_cross.copy()
+        self.w_mean = np.mean(w_cross, axis=0)
+        self.w_std = np.std(w_cross, axis=0)

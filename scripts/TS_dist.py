@@ -35,7 +35,6 @@ def main():
     llh = Likelihood(
         'v4',
         galaxyName=args.galaxy_catalog,
-        background_model='Template',
         recompute_model=args.compute_std,
         Ebinmin=args.ebinmin,
         Ebinmax=args.ebinmax,

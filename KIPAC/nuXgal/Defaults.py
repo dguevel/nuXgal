@@ -42,7 +42,6 @@ WEIGHTED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'WeightedAeff_{year}_{specIn
 TABULATED_AEFF_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-TabulatedAeff.txt')
 EXPOSUREMAP_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{year}-ExposureMap.npy')
 
-BEAM_FORMAT = os.path.join(NUXGAL_IRF_DIR, '{nyear}yr-beam.npy')
 ANALYTIC_CL_PATH = os.path.join(NUXGAL_ANCIL_DIR, 'Cl_ggRM.dat')
 GALAXYMAP_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap.fits')
 GALAXYMAP_TRUE_FORMAT = os.path.join(NUXGAL_ANCIL_DIR, '{galaxyName}_galaxymap_true.fits')
@@ -54,15 +53,13 @@ GALAXYMAP_FIG_FORMAT =  os.path.join(NUXGAL_PLOT_DIR, 'test_{galaxyName}_galaxy.
 SYNTHETIC_EVTMAP_ASTRO_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_astro{i}.fits')
 SYNTHETIC_EVTMAP_ATM_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_atm{i}.fits')
 
-SYNTHETIC_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_mean_{galaxyName}_{nyear}.npy')
-SYNTHETIC_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_std_{galaxyName}_{nyear}.npy')
+SYNTHETIC_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_mean_{galaxyName}_{nyear}_{method}.npy')
+SYNTHETIC_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_std_{galaxyName}_{nyear}_{method}.npy')
 SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_std_{galaxyName}_{nyear}.npy')
 SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ASTRO_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_mean_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ASTRO_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_std_{galaxyName}_{nyear}.txt')
-WEIGHTED_SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_w_atm_std_{galaxyName}_{nyear}.txt')
-WEIGHTED_SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'weighted_Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 
 SYNTHETIC_TS_NULL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}.txt')
 SYNTHETIC_TS_SIGNAL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}_{astroModel}.txt')
