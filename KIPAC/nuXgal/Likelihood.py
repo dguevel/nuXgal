@@ -163,7 +163,7 @@ class Likelihood():
                 cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin)
         cl = np.array(cl)
 
-        return np.std(cl, axis=0)
+        return np.std(cl, axis=0), np.cov(cl.T)
 
     def loadSTDInterpolation(self):
         self.std_interps = {}
