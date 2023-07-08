@@ -10,7 +10,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('-i', '--input', nargs='+', help='Map files')
     parser.add_argument('-o', '--output', help='Output directory')
-    parser.add_argument('--nside', default=128)
+    parser.add_argument('--nside', default=128, type=int)
     args = parser.parse_args()
 
     nside = args.nside

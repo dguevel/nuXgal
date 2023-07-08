@@ -31,7 +31,8 @@ def main():
                         help='Output galaxy map file name save as np array')
     parser.add_argument('--nside',
                         help='Healpix nside parameter for output map',
-                        default=128)
+                        default=128,
+                        type=int)
     parser.add_argument('--cache-dir',
                         default='/data/user/dguevel/astropy/cache',
                         help='astropy cache dir')
