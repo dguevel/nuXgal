@@ -1,6 +1,7 @@
 import os
 
 import csky as cy
+from csky.inj import RARandomizer, DecRandomizer
 import healpy as hp
 import numpy as np
 
@@ -56,6 +57,10 @@ class CskyEventGenerator():
             'flux': cy.hyp.PowerLawFlux(self.gamma),
             'sigsub': True,
             'fast_weight': True,
+            'randomizers': [
+                RARandomizer(),
+                DecRandomizer()
+            ]
         }
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
             self.conf['dir'] = cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
