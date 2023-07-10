@@ -113,7 +113,7 @@ class TemplateModel(Model):
         for iteration in tqdm(np.arange(N_re)):
 
             trial, _ = eg.SyntheticTrial(1000000,
-                                         self.idx_mask,
+                                         keep_total_constant=False,
                                          signal_only=True)
             ns.inputTrial(trial)
             ns.updateMask(self.idx_mask)
@@ -134,10 +134,23 @@ class TemplateBackgroundModel(TemplateModel):
 
 class DataScrambleBackgroundModel(Model):
     method_type = 'data_scramble'
-    def __init__(self):
-        raise NotImplementedError(
-            'DataScrambleBackgroundModel not implemented yet')
     gamma = 2.5
+
+    def calc_w_mean(self, N_re=500):
+        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
+        ns = NeutrinoSample()
+        eg = self.get_event_generator()
+
+        for iteration in tqdm(np.arange(N_re)):
+
+            trial, _ = eg.SyntheticTrial(0)
+            ns.inputTrial(trial)
+            ns.updateMask(self.idx_mask)
+            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+
+        self.w_trials = w_cross.copy()
+        self.w_mean = np.mean(w_cross, axis=0)
+        self.w_std = np.std(w_cross, axis=0)
 
 
 class DataHistogramBackgroundModel(Model):
