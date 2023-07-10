@@ -142,7 +142,7 @@ class DataScrambleBackgroundModel(Model):
 
 class DataHistogramBackgroundModel(Model):
     method_type = 'data_histogram'
-    _bins = np.arange(-1, 1.1, 0.1)
+    _bins = np.arange(-1, 1.1, 0.05)
 
     def _load_events(self):
         events = []
@@ -231,3 +231,15 @@ class DataHistogramBackgroundModel(Model):
         self.w_trials = w_cross.copy()
         self.w_mean = np.mean(w_cross, axis=0)
         self.w_std = np.std(w_cross, axis=0)
+
+
+class FlatBackgroundModel(Model):
+    method_type = 'flat'
+    gamma = 3.7
+
+    def calc_w_mean(self, N_re=500):
+        self.w_mean = np.zeros((Defaults.NEbin, Defaults.NCL))
+        self.w_std = np.ones((Defaults.NEbin, Defaults.NCL))
+
+    def load_model(self):
+        self.calc_w_mean()
