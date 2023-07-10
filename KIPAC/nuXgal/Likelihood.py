@@ -18,7 +18,7 @@ import matplotlib
 from pandas import concat
 
 from scipy.optimize import minimize
-from scipy.stats import norm, distributions
+from scipy.stats import norm, distributions, multivariate_normal
 from scipy.interpolate import interp1d
 
 from .EventGenerator import EventGenerator
@@ -28,7 +28,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import TemplateSignalModel, DataHistogramBackgroundModel
+from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -63,7 +63,6 @@ def significance_from_chi(chi):
     chi2 = chi*chi
     dof = len(chi2)
     return significance(np.sum(chi2), dof)
-
 
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino 
@@ -119,7 +118,12 @@ class Likelihood():
             recompute=recompute_model)
 
         # load background model
-        self.background_model = DataHistogramBackgroundModel(
+        #self.background_model = DataHistogramBackgroundModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model)
+        self.background_model = FlatBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -127,9 +131,15 @@ class Likelihood():
 
         self.w_atm_mean = self.background_model.w_mean
         self.w_model_f1 = self.signal_model.w_mean
-        #self.w_atm_std = self.background_model.w_atm_std
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
+
+    @staticmethod
+    def init_from_run(run_kwargs):
+        """Initialize a likelihood object from a run result from TS_dist.py"""
+        raise NotImplementedError
+
+
 
 
     def anafastMask(self):
@@ -232,7 +242,7 @@ class Likelihood():
 
         self.w_std = np.copy(self.w_atm_std)
         self.w_std_square = np.copy(self.w_atm_std_square)
-        self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL)))
+        self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
 
         for ebin in bootstrap_error:
             self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
@@ -290,6 +300,25 @@ class Likelihood():
 
         return np.sum(lnL_le[:, self.lmin:])
 
+    def log_likelihood_cov(self, f):
+        f = np.array(f)
+
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_data = self.w_data[ebin, self.lmin:]
+
+            w_model_mean = (self.w_model_f1[ebin, self.lmin:] * f[i])
+            w_model_mean += (self.w_atm_mean[ebin, self.lmin:] * (1 - f[i]))
+
+            w_cov = self.w_cov[ebin, self.lmin:, self.lmin]
+
+            lnL_le += multivariate_normal.logpdf(
+                w_data, mean=w_model_mean, cov=w_cov)
+
+        return lnL_le
+
+    def chi_square_Ebin_cov(self, f, energyBin):
+        pass
 
     def chi_square_Ebin(self, f, energyBin):
         w_model_mean = (self.w_model_f1[energyBin].T * f)
@@ -335,6 +364,28 @@ class Likelihood():
 
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
+
+    def minimize__lnL_cov(self):
+        """Minimize the log-likelihood
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+        Returns
+        -------
+        x : `array`
+            The parameters that minimize the log-likelihood
+        TS : `float`
+            The Test Statistic, computed as 2 * logL_x - logL_0
+        """
+        len_f = self.Ebinmax - self.Ebinmin
+        nll = lambda *args: -self.log_likelihood_cov(*args)
+        initial = 0.1 + 0.1 * np.random.randn(len_f)
+        soln = minimize(nll, initial, bounds=[(0, 1)] * (len_f))
+        #soln = minimize(nll, initial)
+
+        return soln.x, (self.log_likelihood_cov(soln.x) -\
+                            self.log_likelihood_cov(np.zeros(len_f))) * 2
 
     def minimize__lnL_free_index(self):
         """Minimize the log-likelihood
