@@ -61,6 +61,8 @@ def main():
             results['gamma'] = args.gamma
             results['ebinmin'] = args.ebinmin
             results['ebinmax'] = args.ebinmax
+            results['logemin'] = Defaults.map_logE_edge[args.ebinmin]
+            results['logemax'] = Defaults.map_logE_edge[args.ebinmax]
             results['galaxy_catalog'] = args.galaxy_catalog
             results['lmin'] = args.lmin
 
@@ -138,8 +140,10 @@ def crosscorr_analysis(llh, trial, args):
 
     if args.save_cls:
         result_dict['cls'] = {}
+        result_dict['cls_std'] = {}
         for ebin in range(args.ebinmin, args.ebinmax):
             result_dict['cls'][ebin] = llh.w_data[ebin].tolist()
+            result_dict['cls_std'][ebin] = llh.w_std[ebin].tolist()
 
     return result_dict
 
