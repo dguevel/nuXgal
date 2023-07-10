@@ -1,7 +1,7 @@
 """Classes and functions to manage neutrino event samples"""
 
 import numpy as np
-
+import scipy
 import healpy as hp
 
 from . import Defaults
@@ -165,3 +165,41 @@ class NeutrinoSample():
         figs = FigureDict()
         figs.mollview_maps('countsmap', self.countsmap)
         figs.save_all(testfigpath, 'pdf')
+
+    def calc_effective_area(self, ana):
+
+        '''
+        Note the following:
+
+        *a=ana.anas[-1] may not contain the entire dataset. For tracks, it will only use the last season whereas DNNCascade
+        loads as one season so the entire dataset is used.
+
+        *dlogE is the logarithmic energy bin width
+
+        *solid_angle represents the portion of the sky that we are observing with the detector
+
+        *In the area eqn defined below, 1/ (1e4*np.log(10)) comes from eqn 5.12 in the thesis linked at the start
+        of this notebook. The 1e4 accounts for converting from cm^2 -> m^2 and np.log(10) accounts for the ln(10) when
+        differentiating dlog(E)
+        '''
+
+        dsindec = 0.05
+        sindec_bins = np.arange(-1, 1.1, dsindec)
+        effective_area_map = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+        ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+
+        for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
+            for subana in ana:
+                mask = subana.sig.log10energy >= elo
+                mask &= subana.sig.log10energy < ehi
+
+                dlogE = ehi - elo
+                solid_angle = 2*np.pi*(np.radians(sindec_bins[1])-np.radians(sindec_bins[0]))
+                area = 1 / (1e4*np.log(10)) * (subana.sig.oneweight[mask] / (subana.sig.true_energy[mask] * solid_angle * dlogE))
+                hist, bins = np.histogram(np.sin(subana.sig.dec[mask]), bins=sindec_bins, weights=area)
+                bins_center = (bins[1:] + bins[:-1]) / 2
+                interp = scipy.interpolate.interp1d(bins_center, hist, kind='nearest', fill_value='extrapolate', bounds_error=False)
+
+                effective_area_map[i] += interp(np.sin(np.radians(dec)))
+
+        return effective_area_map
