@@ -10,7 +10,6 @@ from .DataSpec import ps_v4
 import csky as cy
 import numpy as np
 from tqdm import tqdm
-import scipy
 
 
 class Model(object):
@@ -41,8 +40,8 @@ class Model(object):
             galaxyName=self.name,
             nyear=self.N_yr,
             method=self.method_type)
-        #self.w_atm_std_fname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
-        #self.w_atm_std_fname = self.w_atm_std_fname.format(
+        # self.w_atm_std_fname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
+        # self.w_atm_std_fname = self.w_atm_std_fname.format(
         #    galaxyName=self.name,
         #    nyear=self.N_yr)
 
@@ -51,7 +50,7 @@ class Model(object):
         std_exists = os.path.exists(self.w_std_fname)
         files_exist = mean_exists and std_exists
         if recompute or not files_exist:
-            self.calc_w_mean(N_re=500)
+            self.calc_w_mean(N_re=1000)
             if save_model:
                 self.save_model()
         else:
@@ -170,7 +169,7 @@ class DataHistogramBackgroundModel(Model):
 
         for path in path_list:
             path = os.path.join(
-                cy.selections.Repository.remote_root, 
+                cy.selections.Repository.remote_root,
                 path)
             path = path.format(version=Defaults.ANALYSIS_VERSION)
             evt = cy.utils.Arrays(np.load(path))
@@ -207,7 +206,10 @@ class DataHistogramBackgroundModel(Model):
 
             # assign uniform random sin(Dec) within bin
             dsindec = (self._bins[1] - self._bins[0]) / 2
-            events['sindec'] += np.random.uniform(-dsindec, dsindec, len(events))
+            events['sindec'] += np.random.uniform(
+                -dsindec,
+                dsindec,
+                len(events))
             events['dec'] = np.arcsin(events['sindec'])
 
             # assign uniform random energy within log energy bin

@@ -28,7 +28,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel
+from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel, DataScrambleBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -65,7 +65,7 @@ def significance_from_chi(chi):
     return significance(np.sum(chi2), dof)
 
 class Likelihood():
-    """Class to evaluate the likelihood for a particular model of neutrino 
+    """Class to evaluate the likelihood for a particular model of neutrino
     galaxy correlation"""
     WMeanFname = Defaults.W_MEAN_FORMAT
     AtmSTDFname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
@@ -99,13 +99,14 @@ class Likelihood():
         self.Ebinmax = Ebinmax
         self.lmin = lmin
         # scaled mean and std
-        self.event_generator = CskyEventGenerator(
-            self.N_yr,
-            self.gs,
-            gamma=gamma,
-            Ebinmin=Ebinmin,
-            Ebinmax=Ebinmax,
-            idx_mask=self.idx_mask)
+        #self.event_generator = CskyEventGenerator(
+        #    self.N_yr,
+        #    self.gs,
+        #    gamma=gamma,
+        #    Ebinmin=Ebinmin,
+        #    Ebinmax=Ebinmax,
+        #    idx_mask=self.idx_mask)
+        self._event_generator = None
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -123,24 +124,55 @@ class Likelihood():
         #    self.N_yr,
         #    self.idx_mask,
         #    recompute=recompute_model)
-        self.background_model = FlatBackgroundModel(
+        #self.background_model = FlatBackgroundModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model)
+        self.background_model = DataScrambleBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
-            recompute=recompute_model)
+            recompute=recompute_model
+        )
 
         self.w_atm_mean = self.background_model.w_mean
         self.w_model_f1 = self.signal_model.w_mean
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
+    @property
+    def event_generator(self):
+        if self._event_generator is None:
+            self._event_generator = CskyEventGenerator(
+                self.N_yr,
+                self.gs,
+                gamma=self.gamma,
+                Ebinmin=self.Ebinmin,
+                Ebinmax=self.Ebinmax,
+                idx_mask=self.idx_mask)
+        return self._event_generator
+
     @staticmethod
-    def init_from_run(run_kwargs):
+    def init_from_run(**kwargs):
         """Initialize a likelihood object from a run result from TS_dist.py"""
-        raise NotImplementedError
+        llh = Likelihood(
+            kwargs['N_yr'],
+            kwargs['galaxy_catalog'],
+            kwargs['ebinmin'],
+            kwargs['ebinmax'],
+            kwargs['lmin'],
+            gamma=kwargs['gamma'])
 
+        llh.w_data = np.zeros((Defaults.NEbin, Defaults.NCL))
+        llh.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
+        for i, ebin in enumerate(range(llh.Ebinmin, llh.Ebinmax)):
+            if isinstance(list(kwargs['cls'].keys())[i], str):
+                ebin = str(ebin)
+            llh.w_data[i] = kwargs['cls'][ebin]
+            llh.w_std[i] = kwargs['cls_std'][ebin]
 
-
+        return llh
 
     def anafastMask(self):
         """Generate a mask that merges the neutrino selection mask

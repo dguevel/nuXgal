@@ -10,9 +10,9 @@ VERBOSE = False
 
 # Fixed parameters for the Neutrino sample
 NSIDE = 128             # About 1 square degree pixels
-LOG_EMIN = 3         # 1000 GeV
+LOG_EMIN = 2         # 1000 GeV
 LOG_EMAX = 6          # 1e9 GeV
-NEEdges = 4             # 8 edges, 7 bins, 1 bin per decade
+NEEdges = 5             # 8 edges, 7 bins, 1 bin per decade
 
 DT_DAYS = 333           # Length of run1
 DT_SECONDS = 28771200   # 333 * 86400
