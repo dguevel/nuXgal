@@ -13,16 +13,17 @@ def main():
     """Main function for executing the script."""
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n-trials', help='Number of trials', type=int)
-    parser.add_argument('-i', '--n-inject', 
-                        help='Number of neutrinos to inject', 
+    parser.add_argument('-i', '--n-inject',
+                        help='Number of neutrinos to inject',
                         type=int, nargs='+')
     parser.add_argument('-o', '--output')
-    parser.add_argument('--gamma', help='Injection spectrum power law index', 
+    parser.add_argument('--gamma', help='Injection spectrum power law index',
                         default=2.5, type=float)
-    parser.add_argument('--galaxy-catalog', 
-                        help='Galaxy catalog to cross correlate', 
-                        choices=['WISE', 'Planck', 'unWISE_z=0.4'], 
-                        default='WISE')
+    parser.add_argument('--galaxy-catalog',
+                        help='Galaxy catalog to cross correlate',
+                        choices=['WISE', 'Planck', 'unWISE_z=0.4'],
+                        default='unWISE_z=0.4')
+    parser.add_argument('--nyear', default='v4')
     parser.add_argument('--compute-std', action='store_true')
     parser.add_argument('--ebinmin', default=0, type=int)
     parser.add_argument('--ebinmax', default=3, type=int)
@@ -30,10 +31,11 @@ def main():
     parser.add_argument('--save-cls', action='store_true')
     parser.add_argument('--bootstrap-error', default=[], nargs='+', type=int)
     parser.add_argument('--century-cube', action='store_true')
+    parser.add_argument('--bootstrap-niter', default=100, type=int)
     args = parser.parse_args()
 
     llh = Likelihood(
-        'v4',
+        N_yr=args.nyear,
         galaxyName=args.galaxy_catalog,
         recompute_model=args.compute_std,
         Ebinmin=args.ebinmin,
@@ -65,6 +67,8 @@ def main():
             results['logemax'] = Defaults.map_logE_edge[args.ebinmax]
             results['galaxy_catalog'] = args.galaxy_catalog
             results['lmin'] = args.lmin
+            results['N_yr'] = args.nyear
+            results['bootstrap_niter'] = args.bootstrap_niter
 
             crosscorr_results = crosscorr_analysis(llh, trial, args)
             crosscorr_results['flux_fit'] = eg.trial_runner.to_dNdE(np.sum(crosscorr_results['n_fit']), E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
@@ -129,7 +133,7 @@ def crosscorr_analysis(llh, trial, args):
     ns = NeutrinoSample()
     ns.inputTrial(trial)
     ns.updateMask(llh.idx_mask)
-    llh.inputData(ns, bootstrap_error=args.bootstrap_error)
+    llh.inputData(ns, bootstrap_error=args.bootstrap_error, bootstrap_niter=args.bootstrap_niter)
     result_dict = {}
 
     f_fit, result_dict['TS'] = llh.minimize__lnL()
