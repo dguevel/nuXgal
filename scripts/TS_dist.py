@@ -23,16 +23,35 @@ def main():
     parser.add_argument('--galaxy-catalog',
                         help='Galaxy catalog to cross correlate',
                         choices=['WISE', 'Planck', 'unWISE_z=0.4'],
-                        default='unWISE_z=0.4')
-    parser.add_argument('--nyear', default='v4')
+                        default='unWISE_z=0.4',
+                        help='Galaxy catalog to cross correlate')
+    parser.add_argument('--nyear',
+                        default='v4',
+                        help='PS Tracks version')
     parser.add_argument('--compute-std', action='store_true')
-    parser.add_argument('--ebinmin', default=0, type=int)
-    parser.add_argument('--ebinmax', default=3, type=int)
-    parser.add_argument('--lmin', default=50, type=int)
-    parser.add_argument('--save-cls', action='store_true')
+    parser.add_argument('--ebinmin',
+                        default=0,
+                        type=int,
+                        help='Minimum energy bin')
+    parser.add_argument('--ebinmax',
+                        default=3,
+                        type=int,
+                        help='Maximum energy bin')
+    parser.add_argument('--lmin',
+                        default=50, 
+                        type=int,
+                        help='Minimum multipole')
+    parser.add_argument('--save-cls',
+                        action='store_true',
+                        help='Save cross spectrum')
     parser.add_argument('--bootstrap-niter', default=100, type=int)
-    parser.add_argument('--err-type', default='bootstrap')
-    parser.add_argument('--lbin', default=4, type=int)
+    parser.add_argument('--err-type', default='bootstrap',
+                        help='Error calculation method',
+                        choices=['bootstrap', 'polspice'])
+    parser.add_argument('--lbin',
+                        default=4,
+                        type=int,
+                        help='Cross spectrum bin width')
     args = parser.parse_args()
 
     llh = BeamLikelihood(
