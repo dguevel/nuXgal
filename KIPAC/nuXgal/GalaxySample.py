@@ -6,6 +6,9 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import healpy as hp
+import os
+import tempfile
+from ispice import ispice
 
 import matplotlib.pyplot as plt
 
@@ -55,6 +58,49 @@ class GalaxySample():
         testfigpath = Defaults.GALAXYMAP_FIG_FORMAT.format(
             galaxyName=self.galaxyName)
         plt.savefig(testfigpath)
+
+    def getAutoCorrelation(self):
+        """Return the auto correlation of the galaxy sample"""
+
+        # create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            # write the galaxy map and mask to disk
+            galaxy_map_fname = os.path.join(
+                temp_dir,
+                'galaxy_map.fits'
+            )
+            galaxy_mask_fname = os.path.join(
+                temp_dir,
+                'galaxy_mask.fits'
+            )
+
+            hp.write_map(galaxy_map_fname, self.overdensity)
+            galaxy_mask = np.zeros_like(self.overdensity, dtype=bool)
+            galaxy_mask[self.mask()] = True
+            galaxy_mask = ~galaxy_mask
+            hp.write_map(galaxy_mask_fname, galaxy_mask, dtype=int)
+
+            cl_out_fname = os.path.join(
+                temp_dir,
+                'cl_out.fits'
+            )
+
+            # run PolSpice
+            ispice(
+                mapin1=galaxy_map_fname,
+                maskfile1=galaxy_mask_fname,
+                clout=cl_out_fname,
+                apodizesigma=180,
+                thetamax=180,
+                subav=True,
+                subdipole=True,
+            )
+
+            # read the output and load into the cross correlation array
+            w = hp.read_cl(cl_out_fname)
+
+        return w
 
 class GalaxySample_Atmospheric(GalaxySample):
     @staticmethod

@@ -6,6 +6,7 @@ import numpy as np
 
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal.Likelihood import Likelihood
+from KIPAC.nuXgal.BeamLikelihood import BeamLikelihood
 from KIPAC.nuXgal import Defaults
 
 
@@ -29,19 +30,22 @@ def main():
     parser.add_argument('--ebinmax', default=3, type=int)
     parser.add_argument('--lmin', default=50, type=int)
     parser.add_argument('--save-cls', action='store_true')
-    parser.add_argument('--bootstrap-error', default=[], nargs='+', type=int)
     parser.add_argument('--century-cube', action='store_true')
     parser.add_argument('--bootstrap-niter', default=100, type=int)
+    parser.add_argument('--err-type', default='bootstrap')
+    parser.add_argument('--lbin', default=4, type=int)
     args = parser.parse_args()
 
-    llh = Likelihood(
+    llh = BeamLikelihood(
         N_yr=args.nyear,
         galaxyName=args.galaxy_catalog,
         recompute_model=args.compute_std,
         Ebinmin=args.ebinmin,
         Ebinmax=args.ebinmax,
         lmin=args.lmin,
-        gamma=args.gamma)
+        gamma=args.gamma,
+        err_type=args.err_type,
+        lbin=args.lbin)
 
     trial_runner = llh.event_generator.trial_runner
     eg = llh.event_generator
@@ -69,6 +73,8 @@ def main():
             results['lmin'] = args.lmin
             results['N_yr'] = args.nyear
             results['bootstrap_niter'] = args.bootstrap_niter
+            results['err-type'] = args.err_type
+            results['lbin'] = args.lbin
 
             crosscorr_results = crosscorr_analysis(llh, trial, args)
             crosscorr_results['flux_fit'] = eg.trial_runner.to_dNdE(np.sum(crosscorr_results['n_fit']), E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
@@ -133,14 +139,14 @@ def crosscorr_analysis(llh, trial, args):
     ns = NeutrinoSample()
     ns.inputTrial(trial)
     ns.updateMask(llh.idx_mask)
-    llh.inputData(ns, bootstrap_error=args.bootstrap_error, bootstrap_niter=args.bootstrap_niter)
+    llh.inputData(ns, bootstrap_niter=args.bootstrap_niter)
     result_dict = {}
 
     f_fit, result_dict['TS'] = llh.minimize__lnL()
     result_dict['f_fit'] = list(f_fit)
     result_dict['TS_i'] = [2*(llh.log_likelihood_Ebin(result_dict['f_fit'][i-llh.Ebinmin], i)-llh.log_likelihood_Ebin(0, i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
     result_dict['n_fit'] = list(result_dict['f_fit'] * llh.Ncount[llh.Ebinmin:llh.Ebinmax])
-    result_dict['chi_square'] = [float(llh.chi_square_Ebin(f_fit[i-llh.Ebinmin], i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
+    result_dict['chi_square'] = [-2*float(llh.log_likelihood_Ebin(f_fit[i-llh.Ebinmin], i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
 
     if args.save_cls:
         result_dict['cls'] = {}

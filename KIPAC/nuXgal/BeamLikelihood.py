@@ -11,6 +11,7 @@ import itertools
 import warnings
 from multiprocessing import Pool
 
+from bin_llcl import bin_llcl
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -29,7 +30,6 @@ from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
 from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel, DataScrambleBackgroundModel
-
 
 def significance(chi_square, dof):
     """Construct an significance for a chi**2 distribution
@@ -64,6 +64,7 @@ def significance_from_chi(chi):
     dof = len(chi2)
     return significance(np.sum(chi2), dof)
 
+
 class BeamLikelihood():
     """Class to evaluate the likelihood for a particular model of neutrino
     galaxy correlation"""
@@ -75,7 +76,7 @@ class BeamLikelihood():
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, lbin=4, err_type='polspice'):
         """C'tor
 
         Parameters
@@ -98,18 +99,19 @@ class BeamLikelihood():
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax
         self.lmin = lmin
-        self.beam = np.load('/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_beam.npy')
         self._event_generator = None
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
+        self.lbin = lbin
+        self.err_type = err_type
 
         # load signal model
-        self.signal_model = TemplateSignalModel(
-            self.gs,
-            self.N_yr,
-            self.idx_mask,
-            recompute=recompute_model)
+        #self.signal_model = TemplateSignalModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model)
 
         self.background_model = DataScrambleBackgroundModel(
             self.gs,
@@ -118,10 +120,13 @@ class BeamLikelihood():
             recompute=recompute_model
         )
 
-        self.w_atm_mean = self.background_model.w_mean
-        #self.w_model_f1 = self.signal_model.w_mean
-        self.w_model_f1 = hp.anafast(self.gs.overdensity) / self.f_sky
-        self.w_atm_std = self.background_model.w_std
+        self.w_model_f1 = self.gs.getAutoCorrelation()
+        self.lcenter, self.w_model_f1 = bin_llcl(self.w_model_f1, self.lbin)[:2]
+        self.w_atm_mean = np.zeros((Defaults.NEbin, self.w_model_f1.size))
+        self.w_atm_std = np.zeros((Defaults.NEbin, self.w_model_f1.size))
+        for ebin in range(Defaults.NEbin):
+            self.w_atm_mean[ebin] = bin_llcl(self.background_model.w_mean[ebin], self.lbin)[1]
+            self.w_atm_std[ebin] = self.background_model.w_std[ebin, ::self.lbin][:-1] / np.sqrt(self.lbin)
         self.w_atm_std_square = self.w_atm_std ** 2
 
     @property
@@ -145,15 +150,19 @@ class BeamLikelihood():
             kwargs['ebinmin'],
             kwargs['ebinmax'],
             kwargs['lmin'],
-            gamma=kwargs['gamma'])
+            gamma=kwargs['gamma'],
+            err_type=kwargs['err_type'],
+            lbin=kwargs['lbin'])
 
-        llh.w_data = np.zeros((Defaults.NEbin, Defaults.NCL))
-        llh.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
+        llh.w_data = np.zeros((Defaults.NEbin, int(Defaults.NCL/llh.lbin)-1))
+        llh.w_std = np.zeros((Defaults.NEbin, int(Defaults.NCL/llh.lbin)-1))
+        llh.w_cov = np.zeros((Defaults.NEbin, int(Defaults.NCL/llh.lbin)-1, int(Defaults.NCL/llh.lbin)-1))
         for i, ebin in enumerate(range(llh.Ebinmin, llh.Ebinmax)):
             if isinstance(list(kwargs['cls'].keys())[i], str):
                 ebin = str(ebin)
-            llh.w_data[i] = kwargs['cls'][ebin]
-            llh.w_std[i] = kwargs['cls_std'][ebin]
+            llh.w_data[int(ebin)] = kwargs['cls'][ebin]
+            llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
+            llh.w_cov[int(ebin)] = np.diag(llh.w_std[int(ebin)]**2)
 
         return llh
 
@@ -180,12 +189,12 @@ class BeamLikelihood():
 
         if mp_cpus > 1:
             p = Pool(mp_cpus)
-            iterables = ((flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter))
+            iterables = ((flatevt, galaxy_sample, idx_mask, ebin, self.ana, self.lbin) for i in range(niter))
             cl = p.starmap(bootstrap_worker, iterables)
         else:
-            cl = np.zeros((niter, Defaults.NCL))
+            cl = []
             for i in tqdm(range(niter)):
-                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin)
+                cl.append(bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, self.event_generator.ana, self.lbin))
         cl = np.array(cl)
 
         return np.std(cl, axis=0), np.cov(cl.T)
@@ -227,7 +236,7 @@ class BeamLikelihood():
 
             ns.inputTrial(trial, str(self.N_yr))
             ns.updateMask(self.idx_mask)
-            self.inputData(ns, bootstrap_error=[])
+            self.inputData(ns)
             w_cross[iteration] = self.w_data.copy()
 
         self.w_model_f1 = np.mean(w_cross, axis=0)
@@ -237,7 +246,7 @@ class BeamLikelihood():
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
-    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100, mp_cpus=1):
+    def inputData(self, ns, bootstrap_niter=100, mp_cpus=1):
         """Input data
 
         Parameters
@@ -252,17 +261,27 @@ class BeamLikelihood():
 
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        self.w_data = ns.getCrossCorrelation(self.gs)
+        self.w_data = np.zeros((Defaults.NEbin, int(Defaults.MAX_L / self.lbin)))
+        self.w_cov = np.zeros((Defaults.NEbin, int(Defaults.MAX_L / self.lbin), int(Defaults.MAX_L / self.lbin)))
+        for ebin in range(self.Ebinmin, self.Ebinmax):
+            w_data, w_cov = ns.getCrossCorrelationPolSpiceEbin(self.gs, ebin, self.event_generator.ana)
+            self.lcenter, self.w_data[ebin], _, _ = bin_llcl(w_data, self.lbin)
+            self.w_cov[ebin] = w_cov[::self.lbin, ::self.lbin][:-1, :-1]
+            #self.w_cov[ebin] = bin_llcl(w_cov, self.lbin)[1]
         self.Ncount = ns.getEventCounts()
 
-        self.w_std = np.copy(self.w_atm_std)
-        self.w_std_square = np.copy(self.w_atm_std_square)
-        self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
+        self.w_std = np.zeros_like(self.w_data)
+        self.w_std_square = np.zeros_like(self.w_data)
 
-        for ebin in bootstrap_error:
-            self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
-            self.w_std_square[ebin] = self.w_std[ebin]**2
-
+        for ebin in range(self.Ebinmin, self.Ebinmax):
+            if self.err_type == 'bootstrap':
+                self.w_std[ebin], cov = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
+                self.w_std_square[ebin] = self.w_std[ebin]**2
+            elif self.err_type == 'polspice':
+                self.w_std[ebin] = np.sqrt(np.diag(self.w_cov[ebin]) / self.lbin)
+                self.w_std_square[ebin] = self.w_std[ebin]**2
+            else:
+                raise ValueError('Unknown error type {}'.format(self.err_type))
 
     def log_likelihood_Ebin(self, f, energyBin):
         """Compute the log of the likelihood for a particular model in given energy bin
@@ -279,12 +298,19 @@ class BeamLikelihood():
             The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
         """
         f = np.array(f)
-        w_data = self.w_data / self.beam
-        w_model_mean = (self.w_model_f1[:, np.newaxis] * f).T[energyBin]
-        w_model_std_square = (self.w_std[energyBin])**2
-        w_model_std_square /= self.beam[energyBin] ** 2
-        lnL_le = - (w_data - w_model_mean) ** 2 / w_model_std_square / 2.
-        return np.sum(lnL_le[self.lmin:])
+        lmin = int(self.lmin / self.lbin)
+
+        i = energyBin - self.Ebinmin
+        w_data = self.w_data[energyBin, lmin:]
+
+        w_model_mean = (self.w_model_f1[lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, lmin:] * (1 - f))
+
+        w_cov = self.w_cov[energyBin, lmin:, lmin:] * np.identity(w_data.size)
+
+        lnL_le = multivariate_normal.logpdf(
+            w_data, mean=w_model_mean, cov=w_cov)
+        return lnL_le
 
 
     def log_likelihood(self, f):
@@ -302,25 +328,34 @@ class BeamLikelihood():
         """
 
         f = np.array(f)
-        w_data = self.w_data / self.beam
-        w_model_mean = (self.w_model_f1[:, np.newaxis] * f).T[self.Ebinmin: self.Ebinmax]
-        w_model_std_square = (self.w_std[self.Ebinmin: self.Ebinmax])**2
-        w_model_std_square /= self.beam[self.Ebinmin: self.Ebinmax] ** 2
-        lnL_le = - (w_data - w_model_mean) ** 2 / w_model_std_square / 2.
-
-        return np.sum(lnL_le[:, self.lmin:])
-
-    def log_likelihood_cov(self, f):
-        f = np.array(f)
+        lmin = int(self.lmin / self.lbin)
 
         lnL_le = 0
         for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
-            w_data = self.w_data[ebin, self.lmin:]
+            w_data = self.w_data[ebin, lmin:]
 
-            w_model_mean = (self.w_model_f1[ebin, self.lmin:] * f[i])
-            w_model_mean += (self.w_atm_mean[ebin, self.lmin:] * (1 - f[i]))
+            w_model_mean = (self.w_model_f1[lmin:] * f[i])
+            w_model_mean += (self.w_atm_mean[ebin, lmin:] * (1 - f[i]))
 
-            w_cov = self.w_cov[ebin, self.lmin:, self.lmin]
+            w_cov = self.w_cov[ebin, lmin:, lmin:] * np.identity(w_data.size)
+
+            lnL_le += multivariate_normal.logpdf(
+                w_data, mean=w_model_mean, cov=w_cov)
+        return lnL_le
+
+
+    def log_likelihood_cov(self, f):
+        f = np.array(f)
+        lmin = int(self.lmin / self.lbin)
+
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_data = self.w_data[ebin, lmin:]
+
+            w_model_mean = (self.w_model_f1[lmin:] * f[i])
+            w_model_mean += (self.w_atm_mean[ebin, lmin:] * (1 - f[i]))
+
+            w_cov = self.w_cov[ebin, lmin:, lmin:]
 
             lnL_le += multivariate_normal.logpdf(
                 w_data, mean=w_model_mean, cov=w_cov)
@@ -329,14 +364,10 @@ class BeamLikelihood():
 
     def chi_square_Ebin_cov(self, f, energyBin):
         pass
+        
 
     def chi_square_Ebin(self, f, energyBin):
-        w_model_mean = (self.w_model_f1[energyBin].T * f)
-        w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
-        w_model_std_square = self.w_std_square[energyBin]
-
-        chisquare = (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square
-        return np.sum(chisquare[self.lmin:])
+        return -2 * self.log_likelihood_Ebin(f, energyBin)
 
     def minimize__lnL_analytic(self):
         len_f = self.Ebinmax - self.Ebinmin
@@ -660,7 +691,7 @@ class BeamLikelihood():
         fig.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_MCMCcorner.pdf'))
 
 
-def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
+def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, ana, lbin):
 
     ns2 = NeutrinoSample()
     idx = np.random.choice(len(flatevt), size=len(flatevt))
@@ -671,5 +702,6 @@ def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
     # suppress invalid value warning which we get because of the energy bin filter
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin)
+        cl, cov = ns2.getCrossCorrelationPolSpiceEbin(galaxy_sample, ebin, ana)
+        lcenter, cl, _, _ = bin_llcl(cl, lbin)
     return cl

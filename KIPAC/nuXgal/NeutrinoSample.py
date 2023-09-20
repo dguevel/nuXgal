@@ -3,6 +3,10 @@
 import numpy as np
 import scipy
 import healpy as hp
+import os
+import tempfile
+from ispice import ispice
+from astropy.io import fits
 
 from . import Defaults
 
@@ -22,6 +26,7 @@ class NeutrinoSample():
         self.idx_mask = None
         self.f_sky = 1.
         self.countsmap_fullsky = None
+        self._effective_area = None
 
     def inputTrial(self, trial):
         self.event_list = trial
@@ -160,11 +165,212 @@ class NeutrinoSample():
         w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
         return w_cross
 
+    def getCrossCorrelationPolSpice(self, galaxy_sample, ana):
+        """Compute and return cross correlation between the overdensity map 
+        and a galaxy map using PolSpice
+
+        Parameters
+        ----------
+        galaxy_sample : `KIPAC.nuXgal.GalaxySample.GalaxySample`
+            The galaxy sample for the cross correlation
+
+        Returns
+        -------
+        w_cross : `np.ndarray`
+            The cross correlation
+        """
+
+        # initialize the cross correlation array
+        w_cross = np.zeros((Defaults.NEbin, Defaults.NCL))
+
+        # get the neutrino overdensity
+        nu_overdensity = self.getOverdensity()
+
+        # create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+        #if True:
+        #    temp_dir = '/home/dguevel/temp'
+
+            # write the galaxy map and mask to disk
+            galaxy_map_fname = os.path.join(
+                temp_dir,
+                'galaxy_map.fits'
+            )
+            galaxy_mask_fname = os.path.join(
+                temp_dir,
+                'galaxy_mask.fits'
+            )
+
+            hp.write_map(galaxy_map_fname, galaxy_sample.overdensity)
+            galaxy_mask = np.zeros_like(galaxy_sample.overdensity, dtype=bool)
+            galaxy_mask[galaxy_sample.mask()] = True
+            galaxy_mask = ~galaxy_mask
+            hp.write_map(galaxy_mask_fname, galaxy_mask, dtype=int)
+
+            # loop over energy bins
+            for ebin in range(Defaults.NEbin):
+
+                # write the neutrino map and mask to disk
+                neutrino_map_fname = os.path.join(
+                    temp_dir,
+                    'neutrino_map_ebin{}.fits'.format(ebin)
+                )
+                neutrino_mask_fname = os.path.join(
+                    temp_dir,
+                    'neutrino_mask_ebin{}.fits'.format(ebin)
+                )
+                neutrino_weight_fname = os.path.join(
+                    temp_dir,
+                    'neutrino_weight_ebin{}.fits'.format(ebin)
+                )
+                cl_out_fname = os.path.join(
+                    temp_dir,
+                    'cl_ebin{}.fits'.format(ebin)
+                )
+
+                hp.write_map(neutrino_map_fname, nu_overdensity[ebin])
+                neutrino_mask = np.zeros_like(self.countsmap[ebin], dtype=bool)
+                neutrino_mask[self.idx_mask] = True
+                neutrino_mask = ~neutrino_mask
+                hp.write_map(neutrino_mask_fname, neutrino_mask, dtype=int)
+                #weight = 1 / np.maximum(self.effective_area(ana)[ebin], 0)
+                #weight[np.isnan(weight)] = 0
+                weight = np.maximum(self.effective_area(ana)[ebin], 0)
+                hp.write_map(neutrino_weight_fname, weight)
+
+                # get beam file name
+                beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+
+                # run PolSpice
+                ispice(
+                    mapin1=neutrino_map_fname,
+                    mapfile2=galaxy_map_fname,
+                    maskfile1=neutrino_mask_fname,
+                    maskfile2=galaxy_mask_fname,
+                    #weightfile1=neutrino_weight_fname,
+                    beam1=beam_fname,
+                    clout=cl_out_fname,
+                    apodizesigma=180,
+                    thetamax=180,
+                    subav=True,
+                    subdipole=True,
+                )
+
+                # read the output and load into the cross correlation array
+                w_cross[ebin] = hp.read_cl(cl_out_fname)
+
+        return w_cross
+
+
+    def getCrossCorrelationPolSpiceEbin(self, galaxy_sample, ebin, ana):
+        """Compute and return cross correlation between the overdensity map 
+        and a galaxy map using PolSpice
+
+        Parameters
+        ----------
+        galaxy_sample : `KIPAC.nuXgal.GalaxySample.GalaxySample`
+            The galaxy sample for the cross correlation
+
+        Returns
+        -------
+        w_cross : `np.ndarray`
+            The cross correlation
+        """
+
+        # get the neutrino overdensity
+        nu_overdensity = self.getOverdensity()
+
+        # create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            # write the galaxy map and mask to disk
+            galaxy_map_fname = os.path.join(
+                temp_dir,
+                'galaxy_map.fits'
+            )
+            galaxy_mask_fname = os.path.join(
+                temp_dir,
+                'galaxy_mask.fits'
+            )
+
+            hp.write_map(galaxy_map_fname, galaxy_sample.overdensity)
+            galaxy_mask = np.zeros_like(galaxy_sample.overdensity, dtype=bool)
+            galaxy_mask[galaxy_sample.mask()] = True
+            galaxy_mask = ~galaxy_mask
+            hp.write_map(galaxy_mask_fname, galaxy_mask, dtype=int)
+
+
+            # write the neutrino map and mask to disk
+            neutrino_map_fname = os.path.join(
+                temp_dir,
+                'neutrino_map_ebin{}.fits'.format(ebin)
+            )
+            neutrino_mask_fname = os.path.join(
+                temp_dir,
+                'neutrino_mask_ebin{}.fits'.format(ebin)
+            )
+            neutrino_weight_fname = os.path.join(
+                temp_dir,
+                'neutrino_weight_ebin{}.fits'.format(ebin)
+            )
+            neutrino_cov_fname = os.path.join(
+                temp_dir,
+                'neutrino_cov_ebin{}.fits'.format(ebin)
+            )
+
+            cl_out_fname = os.path.join(
+                temp_dir,
+                'cl_ebin{}.fits'.format(ebin)
+            )
+
+            hp.write_map(neutrino_map_fname, nu_overdensity[ebin])
+            neutrino_mask = np.zeros_like(self.countsmap[ebin], dtype=bool)
+            neutrino_mask[self.idx_mask] = True
+            neutrino_mask = ~neutrino_mask
+            hp.write_map(neutrino_mask_fname, neutrino_mask, dtype=int)
+            #weight = 1 / np.maximum(self.effective_area(ana)[ebin], 0)
+            #weight[np.isnan(weight)] = 0
+            weight = np.maximum(self.effective_area(ana)[ebin], 0)
+            hp.write_map(neutrino_weight_fname, weight)
+
+            # get beam file name
+            beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+
+            # run PolSpice
+            ispice(
+                mapin1=neutrino_map_fname,
+                mapfile2=galaxy_map_fname,
+                maskfile1=neutrino_mask_fname,
+                maskfile2=galaxy_mask_fname,
+                #weightfile1=neutrino_weight_fname,
+                beam1=beam_fname,
+                clout=cl_out_fname,
+                apodizesigma=180,
+                thetamax=180,
+                subav=True,
+                subdipole=True,
+                covfileout=neutrino_cov_fname,
+            )
+
+            # read the output and load into the cross correlation array
+            w_cross = hp.read_cl(cl_out_fname)
+            with fits.open(neutrino_cov_fname) as hdul:
+                w_cov = hdul[0].data[0]
+
+        return w_cross, w_cov
+
     def plotCountsmap(self, testfigpath):
         """Plot and save the maps"""
         figs = FigureDict()
         figs.mollview_maps('countsmap', self.countsmap)
         figs.save_all(testfigpath, 'pdf')
+
+    def effective_area(self, ana):
+        if self._effective_area is None:
+            self._effective_area = self.calc_effective_area(ana)
+            for i in range(Defaults.NEbin):
+                self._effective_area[i] = hp.smoothing(self._effective_area[i], fwhm=5*np.pi/180)
+        return self._effective_area
 
     def calc_effective_area(self, ana):
 
@@ -194,12 +400,11 @@ class NeutrinoSample():
                 mask &= subana.sig.log10energy < ehi
 
                 dlogE = ehi - elo
-                solid_angle = 2*np.pi*(np.radians(sindec_bins[1])-np.radians(sindec_bins[0]))
+                solid_angle = 2*np.pi*(dsindec)
                 area = 1 / (1e4*np.log(10)) * (subana.sig.oneweight[mask] / (subana.sig.true_energy[mask] * solid_angle * dlogE))
                 hist, bins = np.histogram(np.sin(subana.sig.dec[mask]), bins=sindec_bins, weights=area)
                 bins_center = (bins[1:] + bins[:-1]) / 2
                 interp = scipy.interpolate.interp1d(bins_center, hist, kind='nearest', fill_value='extrapolate', bounds_error=False)
-
-                effective_area_map[i] += interp(np.sin(np.radians(dec)))
+                effective_area_map[i] += interp(np.sin(np.radians(dec))) * subana.livetime
 
         return effective_area_map
