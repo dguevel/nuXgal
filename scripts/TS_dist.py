@@ -30,7 +30,6 @@ def main():
     parser.add_argument('--ebinmax', default=3, type=int)
     parser.add_argument('--lmin', default=50, type=int)
     parser.add_argument('--save-cls', action='store_true')
-    parser.add_argument('--century-cube', action='store_true')
     parser.add_argument('--bootstrap-niter', default=100, type=int)
     parser.add_argument('--err-type', default='bootstrap')
     parser.add_argument('--lbin', default=4, type=int)
@@ -54,13 +53,7 @@ def main():
     for n_inject in args.n_inject:
         for i in tqdm(range(args.n_trials)):
             results = {}
-            if args.century_cube:
-                trial = []
-                for i in range(10):
-                    tr, nexc = llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
-                    trial.extend(tr)
-            else:
-                trial, nexc = llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
+            trial, nexc = llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
             results['dof'] = Defaults.MAX_L-llh.lmin-1
             results['n_inj'] = n_inject
             results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
