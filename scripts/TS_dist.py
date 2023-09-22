@@ -23,8 +23,7 @@ def main():
     parser.add_argument('--galaxy-catalog',
                         help='Galaxy catalog to cross correlate',
                         choices=['WISE', 'Planck', 'unWISE_z=0.4'],
-                        default='unWISE_z=0.4',
-                        help='Galaxy catalog to cross correlate')
+                        default='unWISE_z=0.4')
     parser.add_argument('--nyear',
                         default='v4',
                         help='PS Tracks version')
@@ -52,6 +51,9 @@ def main():
                         default=4,
                         type=int,
                         help='Cross spectrum bin width')
+    parser.add_argument('--unblind',
+                        action='store_true',
+                        help='Unblind the analysis')
     args = parser.parse_args()
 
     llh = BeamLikelihood(
@@ -69,42 +71,76 @@ def main():
     eg = llh.event_generator
 
     result_list = []
-    for n_inject in args.n_inject:
-        for i in tqdm(range(args.n_trials)):
-            results = {}
-            trial, nexc = llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
-            results['dof'] = Defaults.MAX_L-llh.lmin-1
-            results['n_inj'] = n_inject
-            results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
-            results['gamma'] = args.gamma
-            results['ebinmin'] = args.ebinmin
-            results['ebinmax'] = args.ebinmax
-            results['logemin'] = Defaults.map_logE_edge[args.ebinmin]
-            results['logemax'] = Defaults.map_logE_edge[args.ebinmax]
-            results['galaxy_catalog'] = args.galaxy_catalog
-            results['lmin'] = args.lmin
-            results['N_yr'] = args.nyear
-            results['bootstrap_niter'] = args.bootstrap_niter
-            results['err-type'] = args.err_type
-            results['lbin'] = args.lbin
 
-            crosscorr_results = crosscorr_analysis(llh, trial, args)
-            crosscorr_results['flux_fit'] = eg.trial_runner.to_dNdE(np.sum(crosscorr_results['n_fit']), E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
-            for key in crosscorr_results:
-                results[key] = crosscorr_results[key]
 
-            template_results = template_analysis(trial, nexc, eg.trial_runner)
-            template_results['template_flux_fit'] = eg.trial_runner.to_dNdE(template_results['template_n_fit'], E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
-            for key in template_results:
-                results[key] = template_results[key]
+    if args.unblind:
+        trial, nexc = llh.event_generator.trial_runner.get_one_trial(TRUTH=True)
+        results = {}
+        results['dof'] = Defaults.MAX_L-llh.lmin-1
+        results['n_inj'] = n_inject
+        results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
+        results['gamma'] = args.gamma
+        results['ebinmin'] = args.ebinmin
+        results['ebinmax'] = args.ebinmax
+        results['logemin'] = Defaults.map_logE_edge[args.ebinmin]
+        results['logemax'] = Defaults.map_logE_edge[args.ebinmax]
+        results['galaxy_catalog'] = args.galaxy_catalog
+        results['lmin'] = args.lmin
+        results['N_yr'] = args.nyear
+        results['bootstrap_niter'] = args.bootstrap_niter
+        results['err-type'] = args.err_type
+        results['lbin'] = args.lbin
 
-            results['n_total'] = int(np.sum(llh.Ncount))
-            results['n_total_i'] = dict(zip(range(args.ebinmin, args.ebinmax), llh.Ncount[args.ebinmin:args.ebinmax].astype(int).tolist()))
-            results['n_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)))
-            results['f_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), (find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)/llh.Ncount[args.ebinmin:args.ebinmax]).tolist()))
-            results['f_inj'] = float(results['n_inj'] / results['n_total'])
+        crosscorr_results = crosscorr_analysis(llh, trial, args)
+        crosscorr_results['flux_fit'] = eg.trial_runner.to_dNdE(np.sum(crosscorr_results['n_fit']), E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
+        for key in crosscorr_results:
+            results[key] = crosscorr_results[key]
 
-            result_list.append(results)
+        results['n_total'] = int(np.sum(llh.Ncount))
+        results['n_total_i'] = dict(zip(range(args.ebinmin, args.ebinmax), llh.Ncount[args.ebinmin:args.ebinmax].astype(int).tolist()))
+        results['n_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)))
+        results['f_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), (find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)/llh.Ncount[args.ebinmin:args.ebinmax]).tolist()))
+        results['f_inj'] = float(results['n_inj'] / results['n_total'])
+
+        result_list.append(results)
+
+    else:
+        for n_inject in args.n_inject:
+            for i in tqdm(range(args.n_trials)):
+                results = {}
+                trial, nexc = llh.event_generator.SyntheticTrial(n_inject, keep_total_constant=False)
+                results['dof'] = Defaults.MAX_L-llh.lmin-1
+                results['n_inj'] = n_inject
+                results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
+                results['gamma'] = args.gamma
+                results['ebinmin'] = args.ebinmin
+                results['ebinmax'] = args.ebinmax
+                results['logemin'] = Defaults.map_logE_edge[args.ebinmin]
+                results['logemax'] = Defaults.map_logE_edge[args.ebinmax]
+                results['galaxy_catalog'] = args.galaxy_catalog
+                results['lmin'] = args.lmin
+                results['N_yr'] = args.nyear
+                results['bootstrap_niter'] = args.bootstrap_niter
+                results['err-type'] = args.err_type
+                results['lbin'] = args.lbin
+
+                crosscorr_results = crosscorr_analysis(llh, trial, args)
+                crosscorr_results['flux_fit'] = eg.trial_runner.to_dNdE(np.sum(crosscorr_results['n_fit']), E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
+                for key in crosscorr_results:
+                    results[key] = crosscorr_results[key]
+
+                template_results = template_analysis(trial, nexc, eg.trial_runner)
+                template_results['template_flux_fit'] = eg.trial_runner.to_dNdE(template_results['template_n_fit'], E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
+                for key in template_results:
+                    results[key] = template_results[key]
+
+                results['n_total'] = int(np.sum(llh.Ncount))
+                results['n_total_i'] = dict(zip(range(args.ebinmin, args.ebinmax), llh.Ncount[args.ebinmin:args.ebinmax].astype(int).tolist()))
+                results['n_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)))
+                results['f_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), (find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)/llh.Ncount[args.ebinmin:args.ebinmax]).tolist()))
+                results['f_inj'] = float(results['n_inj'] / results['n_total'])
+
+                result_list.append(results)
 
     with open(args.output, 'w') as fp:
         json.dump(result_list, fp, indent=4)
