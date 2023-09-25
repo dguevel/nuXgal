@@ -5,7 +5,6 @@ import os
 from . import Defaults
 from .CskyEventGenerator import CskyEventGenerator
 from .NeutrinoSample import NeutrinoSample
-from .DataSpec import ps_v4
 
 import csky as cy
 import numpy as np
@@ -135,7 +134,7 @@ class DataScrambleBackgroundModel(Model):
     method_type = 'data_scramble'
     gamma = 2.5
 
-    def calc_w_mean(self, N_re=500):
+    def calc_w_mean(self, N_re=500, estimator='polspice', ana=None):
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         ns = NeutrinoSample()
         eg = self.get_event_generator()
@@ -145,7 +144,11 @@ class DataScrambleBackgroundModel(Model):
             trial, _ = eg.SyntheticTrial(0)
             ns.inputTrial(trial)
             ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+            if estimator == 'anafast':
+                w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+            elif estimator == 'polspice':
+                w_cross[iteration] = ns.getCrossCorrelationPolSpice(self.galaxy_sample, ana)
+
 
         self.w_trials = w_cross.copy()
         self.w_mean = np.mean(w_cross, axis=0)
