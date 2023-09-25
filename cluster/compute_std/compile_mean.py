@@ -10,14 +10,14 @@ from KIPAC.nuXgal import Defaults
 
 def main():
     parser = ArgumentParser(description='Compute standard deviation of cross power spectrum')
-    parser.add_argument('-i', '--input', help='Input files')
+    parser.add_argument('-i', '--input', nargs='+', help='Input files')
     parser.add_argument('-o', '--output', help='Output file')
     parser.add_argument('--n-ebins', default=3, type=int, help='Number of energy bins')
     args = parser.parse_args()
 
     # Read in data
     data = []
-    files = glob(args.input)
+    files = args.input
     for filename in files:
         with open(filename, 'r') as f:
             data.extend(json.load(f))
@@ -29,15 +29,17 @@ def main():
             cl_matrix[i, int(ebin)] = d['cls'][ebin]
 
     cl_mean = np.mean(cl_matrix, axis=0)
+    cl_std = np.std(cl_matrix, axis=0)
 
-    fig, ax = plt.subplots(dpi=150)
-    l = np.arange(Defaults.NCL)
-    lmin = 0
-    for i in range(3):
-        ax.plot(l[lmin:], l[lmin:]**2*cl_mean[i, lmin:])
-    plt.savefig('plots/mean.png')
+    #fig, ax = plt.subplots(dpi=150)
+    #l = np.arange(Defaults.NCL)
+    #lmin = 0
+    #for i in range(3):
+    #    ax.plot(l[lmin:], l[lmin:]**2*cl_mean[i, lmin:])
+    #plt.savefig('plots/mean.png')
 
-    pass
+    np.save(args.output, cl_mean)
+    np.save(args.output.replace('mean', 'std'), cl_std)
 
 
 
