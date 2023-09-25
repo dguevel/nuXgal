@@ -5,7 +5,6 @@ import os
 import numpy as np
 
 from . import Defaults
-from .DataSpec import ps_3yr, ps_10yr
 
 from . import file_utils
 

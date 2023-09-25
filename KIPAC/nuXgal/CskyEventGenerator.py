@@ -6,7 +6,8 @@ import healpy as hp
 import numpy as np
 
 from . import Defaults
-from .DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
+#from .DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
+from .DataSpec import data_spec_factory
 
 
 class NullEnergyPDFRatioEvaluator(cy.pdf.EnergyPDFRatioEvaluator):
@@ -30,11 +31,12 @@ class CskyEventGenerator():
         self.log_emax = Defaults.map_logE_edge[Ebinmax]
         self.idx_mask = idx_mask
 
+        data_specs = data_spec_factory(Ebinmin, Ebinmax)
         self.dataspec = {
-            3: ps_3yr,
-            10: ps_10yr,
-            'v4': ps_v4,
-            'estes_10': estes_10yr}[N_yr]
+            3: data_specs.ps_3yr,
+            10: data_specs.ps_10yr,
+            'v4': data_specs.ps_v4,
+            'estes_10': data_specs.estes_10yr}[N_yr]
 
         density_nu = galaxy_sample.density.copy()
         density_nu[idx_mask[0]] = hp.UNSEEN
@@ -44,9 +46,9 @@ class CskyEventGenerator():
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
-            self.ana.save(self.ana_dir)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
+            #self.ana.save(self.ana_dir)
 
         else:
             self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
