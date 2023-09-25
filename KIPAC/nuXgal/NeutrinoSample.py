@@ -235,8 +235,8 @@ class NeutrinoSample():
                 hp.write_map(neutrino_mask_fname, neutrino_mask, dtype=int)
                 #weight = 1 / np.maximum(self.effective_area(ana)[ebin], 0)
                 #weight[np.isnan(weight)] = 0
-                weight = np.maximum(self.effective_area(ana)[ebin], 0)
-                hp.write_map(neutrino_weight_fname, weight)
+                #weight = np.maximum(self.effective_area(ana)[ebin], 0)
+                #hp.write_map(neutrino_weight_fname, weight)
 
                 # get beam file name
                 beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
@@ -248,7 +248,7 @@ class NeutrinoSample():
                     maskfile1=neutrino_mask_fname,
                     maskfile2=galaxy_mask_fname,
                     #weightfile1=neutrino_weight_fname,
-                    beam1=beam_fname,
+                    beam_file1=beam_fname,
                     clout=cl_out_fname,
                     apodizesigma=180,
                     thetamax=180,
@@ -330,8 +330,8 @@ class NeutrinoSample():
             hp.write_map(neutrino_mask_fname, neutrino_mask, dtype=int)
             #weight = 1 / np.maximum(self.effective_area(ana)[ebin], 0)
             #weight[np.isnan(weight)] = 0
-            weight = np.maximum(self.effective_area(ana)[ebin], 0)
-            hp.write_map(neutrino_weight_fname, weight)
+            #weight = np.maximum(self.effective_area(ana)[ebin], 0)
+            #hp.write_map(neutrino_weight_fname, weight)
 
             # get beam file name
             beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
@@ -343,7 +343,7 @@ class NeutrinoSample():
                 maskfile1=neutrino_mask_fname,
                 maskfile2=galaxy_mask_fname,
                 #weightfile1=neutrino_weight_fname,
-                beam1=beam_fname,
+                beam_file1=beam_fname,
                 clout=cl_out_fname,
                 apodizesigma=180,
                 thetamax=180,
