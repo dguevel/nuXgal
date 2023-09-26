@@ -29,7 +29,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel, DataScrambleBackgroundModel
+from .Models import DataScrambleBackgroundModel
 
 def significance(chi_square, dof):
     """Construct an significance for a chi**2 distribution
@@ -76,7 +76,7 @@ class BeamLikelihood():
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, lbin=4, err_type='polspice'):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, lbin=1, err_type='polspice'):
         """C'tor
 
         Parameters
@@ -121,12 +121,16 @@ class BeamLikelihood():
         )
 
         self.w_model_f1 = self.gs.getAutoCorrelation()
-        self.lcenter, self.w_model_f1 = bin_llcl(self.w_model_f1, self.lbin)[:2]
+        #self.lcenter, self.w_model_f1 = bin_llcl(self.w_model_f1, self.lbin)[:2]
+        self.lcenter = np.arange(Defaults.NCL)
         self.w_atm_mean = np.zeros((Defaults.NEbin, self.w_model_f1.size))
         self.w_atm_std = np.zeros((Defaults.NEbin, self.w_model_f1.size))
         for ebin in range(Defaults.NEbin):
-            self.w_atm_mean[ebin] = bin_llcl(self.background_model.w_mean[ebin], self.lbin)[1]
-            self.w_atm_std[ebin] = self.background_model.w_std[ebin, ::self.lbin][:-1] / np.sqrt(self.lbin)
+            #self.w_atm_mean[ebin] = bin_llcl(self.background_model.w_mean[ebin], self.lbin)[1]
+            #self.w_atm_std[ebin] = self.background_model.w_std[ebin, ::self.lbin][:-1] / np.sqrt(self.lbin)
+
+            self.w_atm_mean[ebin] = self.background_model.w_mean[ebin]
+            self.w_atm_std[ebin] = self.background_model.w_std[ebin]
         self.w_atm_std_square = self.w_atm_std ** 2
 
     @property
@@ -261,13 +265,16 @@ class BeamLikelihood():
 
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        self.w_data = np.zeros((Defaults.NEbin, int(Defaults.MAX_L / self.lbin)))
-        self.w_cov = np.zeros((Defaults.NEbin, int(Defaults.MAX_L / self.lbin), int(Defaults.MAX_L / self.lbin)))
+        self.w_data = np.zeros((Defaults.NEbin, int(Defaults.NCL / self.lbin)))
+        self.w_cov = np.zeros((Defaults.NEbin, int(Defaults.NCL / self.lbin), int(Defaults.NCL / self.lbin)))
         for ebin in range(self.Ebinmin, self.Ebinmax):
             w_data, w_cov = ns.getCrossCorrelationPolSpiceEbin(self.gs, ebin, self.event_generator.ana)
-            self.lcenter, self.w_data[ebin], _, _ = bin_llcl(w_data, self.lbin)
-            self.w_cov[ebin] = w_cov[::self.lbin, ::self.lbin][:-1, :-1]
-            #self.w_cov[ebin] = bin_llcl(w_cov, self.lbin)[1]
+            #self.lcenter, self.w_data[ebin], _, _ = bin_llcl(w_data, self.lbin)
+            #self.w_cov[ebin] = w_cov[::self.lbin, ::self.lbin]#[:-1, :-1]
+
+            self.w_data[ebin] = w_data
+            self.w_cov[ebin] = w_cov
+
         self.Ncount = ns.getEventCounts()
 
         self.w_std = np.zeros_like(self.w_data)
@@ -345,6 +352,19 @@ class BeamLikelihood():
 
 
     def log_likelihood_cov(self, f):
+        """Log likelihood with a covariance matrix
+        
+        Parameters
+        ----------
+        f : `float` 
+            Fraction of neutrinos corelated with the Galaxy sample
+            
+        Returns
+        -------
+        logL : `float`
+            The log likelihood, including covariance
+        """
+
         f = np.array(f)
         lmin = int(self.lmin / self.lbin)
 
@@ -363,7 +383,17 @@ class BeamLikelihood():
         return lnL_le
 
     def chi_square_Ebin_cov(self, f, energyBin):
-        pass
+        """Chi squared with covariance matrix for one energy bin."""
+        w_data = self.w_data[energyBin, self.lmin:]
+
+        w_model_mean = (self.w_model_f1[self.lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
+
+        w_cov = self.w_cov[energyBin, self.lmin:, self.lmin:]
+
+        x = w_data - w_model_mean
+        chi2 = np.dot(x, np.linalg.solve(w_cov, x))
+        return chi2
         
 
     def chi_square_Ebin(self, f, energyBin):
