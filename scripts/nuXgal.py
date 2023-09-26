@@ -6,7 +6,7 @@ import numpy as np
 
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal.Likelihood import Likelihood
-from KIPAC.nuXgal.BeamLikelihood import BeamLikelihood
+from KIPAC.nuXgal.PolSpiceLikelihood import PolSpiceLikelihood
 from KIPAC.nuXgal import Defaults
 
 
@@ -54,18 +54,36 @@ def main():
     parser.add_argument('--unblind',
                         action='store_true',
                         help='Unblind the analysis')
+    parser.add_argument('--estimator',
+                        choices=['anafast', 'polspice'],
+                        default='polspice',
+                        help='Estimator for cross correlation')
     args = parser.parse_args()
 
-    llh = BeamLikelihood(
-        N_yr=args.nyear,
-        galaxyName=args.galaxy_catalog,
-        recompute_model=args.compute_std,
-        Ebinmin=args.ebinmin,
-        Ebinmax=args.ebinmax,
-        lmin=args.lmin,
-        gamma=args.gamma,
-        err_type=args.err_type,
-        lbin=args.lbin)
+
+    if args.estimator == 'polspice':
+        llh = PolSpiceLikelihood(
+            N_yr=args.nyear,
+            galaxyName=args.galaxy_catalog,
+            recompute_model=args.compute_std,
+            Ebinmin=args.ebinmin,
+            Ebinmax=args.ebinmax,
+            lmin=args.lmin,
+            gamma=args.gamma,
+            err_type=args.err_type,
+            lbin=args.lbin)
+    elif args.estimator == 'anafast':
+        llh = Likelihood(
+            N_yr=args.nyear,
+            galaxyName=args.galaxy_catalog,
+            recompute_model=args.compute_std,
+            Ebinmin=args.ebinmin,
+            Ebinmax=args.ebinmax,
+            lmin=args.lmin,
+            gamma=args.gamma)
+    else:
+        raise ValueError('Not a valid estimator')
+    
 
     trial_runner = llh.event_generator.trial_runner
     eg = llh.event_generator

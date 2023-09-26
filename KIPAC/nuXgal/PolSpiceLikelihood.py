@@ -65,7 +65,7 @@ def significance_from_chi(chi):
     return significance(np.sum(chi2), dof)
 
 
-class BeamLikelihood():
+class PolSpiceLikelihood():
     """Class to evaluate the likelihood for a particular model of neutrino
     galaxy correlation"""
     WMeanFname = Defaults.W_MEAN_FORMAT
@@ -148,7 +148,7 @@ class BeamLikelihood():
     @staticmethod
     def init_from_run(**kwargs):
         """Initialize a likelihood object from a run result from TS_dist.py"""
-        llh = BeamLikelihood(
+        llh = PolSpiceLikelihood(
             kwargs['N_yr'],
             kwargs['galaxy_catalog'],
             kwargs['ebinmin'],
