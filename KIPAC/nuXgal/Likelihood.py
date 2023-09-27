@@ -255,7 +255,7 @@ class Likelihood():
             np.savetxt(self.AstroMeanFname, self.w_model_f1)
             np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
-    def inputData(self, ns, bootstrap_error=[], bootstrap_niter=100, mp_cpus=1):
+    def inputData(self, ns, bootstrap_niter=100, mp_cpus=1):
         """Input data
 
         Parameters
@@ -277,7 +277,7 @@ class Likelihood():
         self.w_std_square = np.copy(self.w_atm_std_square)
         self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
 
-        for ebin in bootstrap_error:
+        for ebin in range(self.Ebinmin, self.Ebinmax):
             self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
