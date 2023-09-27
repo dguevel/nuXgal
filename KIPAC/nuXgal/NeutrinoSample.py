@@ -28,6 +28,11 @@ class NeutrinoSample():
         self.countsmap_fullsky = None
         self._effective_area = None
 
+        self.bl = np.zeros((Defaults.NEbin, Defaults.NCL))
+        for ebin in range(Defaults.NEbin):
+            bl_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+            self.bl[ebin] = np.loadtxt(bl_fname)[:, 1]
+
     def inputTrial(self, trial):
         self.event_list = trial
         self.countsMap()
@@ -143,7 +148,7 @@ class NeutrinoSample():
         overdensity_gal = galaxy_sample.overdensity
         w_cross = np.zeros((Defaults.NEbin, Defaults.NCL))
         for i in range(Defaults.NEbin):
-            w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
+            w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[i]
         return w_cross
 
     def getCrossCorrelationEbin(self, galaxy_sample, ebin):
@@ -162,7 +167,7 @@ class NeutrinoSample():
 
         overdensity_nu = self.getOverdensity()
         overdensity_gal = galaxy_sample.overdensity
-        w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
+        w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[ebin]
         return w_cross
 
     def getCrossCorrelationPolSpice(self, galaxy_sample, ana):

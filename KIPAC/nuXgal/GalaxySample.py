@@ -62,6 +62,12 @@ class GalaxySample():
     def getAutoCorrelation(self):
         """Return the auto correlation of the galaxy sample"""
 
+        w_auto = hp.anafast(self.overdensity, lmax=Defaults.MAX_L) / self.f_sky
+        return w_auto
+
+    def getAutoCorrelationPolSpice(self):
+        """Return the auto correlation of the galaxy sample"""
+
         # create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
 

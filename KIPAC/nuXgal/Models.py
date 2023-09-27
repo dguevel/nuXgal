@@ -134,7 +134,7 @@ class DataScrambleBackgroundModel(Model):
     method_type = 'data_scramble'
     gamma = 2.5
 
-    def calc_w_mean(self, N_re=500, estimator='polspice', ana=None):
+    def calc_w_mean(self, N_re=500, estimator='anafast', ana=None):
         w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
         ns = NeutrinoSample()
         eg = self.get_event_generator()

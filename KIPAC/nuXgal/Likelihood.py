@@ -112,11 +112,11 @@ class Likelihood():
         self.gamma = gamma
 
         # load signal model
-        self.signal_model = TemplateSignalModel(
-            self.gs,
-            self.N_yr,
-            self.idx_mask,
-            recompute=recompute_model)
+        #self.signal_model = TemplateSignalModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model)
 
         # load background model
         #self.background_model = DataHistogramBackgroundModel(
@@ -137,7 +137,8 @@ class Likelihood():
         )
 
         self.w_atm_mean = self.background_model.w_mean
-        self.w_model_f1 = self.signal_model.w_mean
+        #self.w_model_f1 = self.signal_model.w_mean
+        self.w_model_f1 = self.gs.getAutoCorrelation()
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
@@ -295,15 +296,19 @@ class Likelihood():
         logL : `float`
             The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
         """
-        #w_model_mean = self.w_model_f1[energyBin] * f
-        w_model_mean = (self.w_model_f1[energyBin].T * f)
-        w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
-        #w_model_std_square = self.w_std_square0[energyBin] / self.Ncount[energyBin]
-        w_model_std_square = self.w_std_square[energyBin]
-        #w_model_std_square = self.std_interps[energyBin](f)**2
 
-        lnL_le = - (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square / 2.
-        return np.sum(lnL_le[self.lmin:])
+        f = np.array(f)
+
+        w_data = self.w_data[energyBin, self.lmin:]
+
+        w_model_mean = (self.w_model_f1[self.lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
+
+        w_std = self.w_std[energyBin, self.lmin:]
+
+        lnL_le = norm.logpdf(
+            w_data, loc=w_model_mean, scale=w_std)
+        return np.sum(lnL_le)
 
 
     def log_likelihood(self, f):
@@ -321,36 +326,20 @@ class Likelihood():
         """
 
         f = np.array(f)
-        w_data = self.w_data
-
-        w_model_mean = (self.w_model_f1[self.Ebinmin : self.Ebinmax].T * f).T
-        w_model_mean += (self.w_atm_mean[self.Ebinmin : self.Ebinmax].T * (1 - f)).T
-
-        w_model_std_square = (self.w_std[self.Ebinmin : self.Ebinmax].T)**2
-        lnL_le = - (w_data[self.Ebinmin : self.Ebinmax] - w_model_mean) ** 2 / w_model_std_square.T / 2.
-
-
-        return np.sum(lnL_le[:, self.lmin:])
-
-    def log_likelihood_cov(self, f):
-        f = np.array(f)
 
         lnL_le = 0
         for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
             w_data = self.w_data[ebin, self.lmin:]
 
-            w_model_mean = (self.w_model_f1[ebin, self.lmin:] * f[i])
+            w_model_mean = (self.w_model_f1[self.lmin:] * f[i])
             w_model_mean += (self.w_atm_mean[ebin, self.lmin:] * (1 - f[i]))
 
-            w_cov = self.w_cov[ebin, self.lmin:, self.lmin]
+            w_std = self.w_std[ebin, self.lmin:]
 
-            lnL_le += multivariate_normal.logpdf(
-                w_data, mean=w_model_mean, cov=w_cov)
+            lnL_le += norm.logpdf(
+                w_data, loc=w_model_mean, scale=w_std)
+        return np.sum(lnL_le)
 
-        return lnL_le
-
-    def chi_square_Ebin_cov(self, f, energyBin):
-        pass
 
     def chi_square_Ebin(self, f, energyBin):
         w_model_mean = (self.w_model_f1[energyBin].T * f)

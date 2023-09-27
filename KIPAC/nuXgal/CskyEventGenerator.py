@@ -6,7 +6,6 @@ import healpy as hp
 import numpy as np
 
 from . import Defaults
-#from .DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
 from .DataSpec import data_spec_factory
 
 
@@ -46,9 +45,9 @@ class CskyEventGenerator():
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
-            #self.ana.save(self.ana_dir)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
+            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
+            self.ana.save(self.ana_dir)
 
         else:
             self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
