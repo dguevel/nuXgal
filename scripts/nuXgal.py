@@ -60,7 +60,6 @@ def main():
                         help='Estimator for cross correlation')
     args = parser.parse_args()
 
-
     if args.estimator == 'polspice':
         llh = PolSpiceLikelihood(
             N_yr=args.nyear,
@@ -83,13 +82,11 @@ def main():
             gamma=args.gamma)
     else:
         raise ValueError('Not a valid estimator')
-    
 
     trial_runner = llh.event_generator.trial_runner
     eg = llh.event_generator
 
     result_list = []
-
 
     if args.unblind:
         trial, nexc = llh.event_generator.trial_runner.get_one_trial(TRUTH=True)
@@ -163,7 +160,6 @@ def main():
     with open(args.output, 'w') as fp:
         json.dump(result_list, fp, indent=4)
 
-
 def find_n_inj_per_bin(trial, ebinmin, ebinmax):
     """
     Find the number of injections per energy bin.
@@ -188,7 +184,6 @@ def find_n_inj_per_bin(trial, ebinmin, ebinmax):
                 n_inj[-1] += int(idx.sum())
 
     return n_inj
-
 
 def crosscorr_analysis(llh, trial, args):
     """
@@ -223,7 +218,6 @@ def crosscorr_analysis(llh, trial, args):
 
     return result_dict
 
-
 def template_analysis(trial, nexc, trial_runner):
     """
     Perform template analysis.
@@ -243,7 +237,6 @@ def template_analysis(trial, nexc, trial_runner):
     elif len(fit_res) == 3:
         result['template_TS'], result['template_n_fit'], result['template_gamma'] = fit_res
     return result
-
 
 if __name__ == '__main__':
     main()

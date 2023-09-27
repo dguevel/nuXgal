@@ -18,7 +18,7 @@ import matplotlib
 from pandas import concat
 
 from scipy.optimize import minimize
-from scipy.stats import norm, distributions, multivariate_normal
+from scipy.stats import norm, distributions
 from scipy.interpolate import interp1d
 
 from .EventGenerator import EventGenerator
@@ -28,7 +28,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import TemplateSignalModel, DataHistogramBackgroundModel, FlatBackgroundModel, DataScrambleBackgroundModel
+from .Models import DataScrambleBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -64,6 +64,7 @@ def significance_from_chi(chi):
     dof = len(chi2)
     return significance(np.sum(chi2), dof)
 
+
 class Likelihood():
     """Class to evaluate the likelihood for a particular model of neutrino
     galaxy correlation"""
@@ -98,37 +99,11 @@ class Likelihood():
         self.Ebinmin = Ebinmin
         self.Ebinmax = Ebinmax
         self.lmin = lmin
-        # scaled mean and std
-        #self.event_generator = CskyEventGenerator(
-        #    self.N_yr,
-        #    self.gs,
-        #    gamma=gamma,
-        #    Ebinmin=Ebinmin,
-        #    Ebinmax=Ebinmax,
-        #    idx_mask=self.idx_mask)
         self._event_generator = None
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
 
-        # load signal model
-        #self.signal_model = TemplateSignalModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model)
-
-        # load background model
-        #self.background_model = DataHistogramBackgroundModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model)
-        #self.background_model = FlatBackgroundModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model)
         self.background_model = DataScrambleBackgroundModel(
             self.gs,
             self.N_yr,
@@ -137,7 +112,6 @@ class Likelihood():
         )
 
         self.w_atm_mean = self.background_model.w_mean
-        #self.w_model_f1 = self.signal_model.w_mean
         self.w_model_f1 = self.gs.getAutoCorrelation()
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
@@ -218,7 +192,6 @@ class Likelihood():
             self.std_interps[ebin] = interp1d(data['f_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
             self.std_interps_n[ebin] = interp1d(data['n_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
 
-
     def calculate_w_mean(self):
         """Compute the mean cross corrleations assuming neutrino sources follow the same alm
             Note that this is slightly different from the original Cl as the mask has been updated.
@@ -281,7 +254,6 @@ class Likelihood():
             self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
-
     def log_likelihood_Ebin(self, f, energyBin):
         """Compute the log of the likelihood for a particular model in given energy bin
 
@@ -309,7 +281,6 @@ class Likelihood():
         lnL_le = norm.logpdf(
             w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
-
 
     def log_likelihood(self, f):
         """Compute the log of the likelihood for a particular model
@@ -340,7 +311,6 @@ class Likelihood():
                 w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
 
-
     def chi_square_Ebin(self, f, energyBin):
         w_model_mean = (self.w_model_f1[energyBin].T * f)
         w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
@@ -362,7 +332,6 @@ class Likelihood():
 
         ts = 2*(self.log_likelihood(f) - self.log_likelihood(np.zeros(len_f)))
         return f, ts
-
 
     def minimize__lnL(self):
         """Minimize the log-likelihood
@@ -433,7 +402,6 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(null_x)) * 2
 
-
     def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):
         """Generate a Test Statistic distribution for simulated trials
 
@@ -482,8 +450,6 @@ class Likelihood():
 
             np.savetxt(TSpath, TS_array)
         return TS_array
-
-
 
     def plotCastro(self, TS_threshold=4, coloralphalimit=0.01, colorfbin=500):
         """Make a 'Castro' plot of the likelihood
@@ -573,10 +539,6 @@ class Likelihood():
         plt.subplots_adjust(left=0.14, bottom=0.14)
         plt.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_sedlnl.png'))
 
-
-
-
-
     def log_prior(self, f):
         """Compute log of the prior on a f, implemented as a flat prior between 0 and 1.5
 
@@ -593,7 +555,6 @@ class Likelihood():
         if np.min(f) > -4. and np.max(f) < 4.:
             return 0.
         return -np.inf
-
 
     def log_probability(self, f):
         """Compute log of the probablity of f, given some data
@@ -613,9 +574,6 @@ class Likelihood():
             return -np.inf
         return lp + self.log_likelihood(f)
 
-
-
-
     def runMCMC(self, Nwalker, Nstep):
         """Run a Markov Chain Monte Carlo
 
@@ -633,8 +591,6 @@ class Likelihood():
         backend.reset(nwalkers, ndim)
         sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability, backend=backend)
         sampler.run_mcmc(pos, Nstep, progress=True)
-
-
 
     def plotMCMCchain(self, ndim, labels, truths, plotChain=False):
         """Plot the results of a Markov Chain Monte Carlo
@@ -670,7 +626,6 @@ class Likelihood():
         fig = corner.corner(flat_samples, labels=labels, truths=truths)
         fig.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_MCMCcorner.pdf'))
 
-
 def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
 
     ns2 = NeutrinoSample()
@@ -679,7 +634,8 @@ def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
 
     ns2.inputTrial([[newevt]])
     ns2.updateMask(idx_mask)
-    # suppress invalid value warning which we get because of the energy bin filter
+    # suppress invalid value warning which we get because of
+    #  the energy bin filter
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin)
