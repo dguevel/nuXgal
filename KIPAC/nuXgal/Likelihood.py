@@ -130,7 +130,19 @@ class Likelihood():
 
     @staticmethod
     def init_from_run(**kwargs):
-        """Initialize a likelihood object from a run result from TS_dist.py"""
+        """
+        Initialize a likelihood from JSON trial output
+        
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments from JSON trial from nuXgal.py
+
+        Returns
+        -------
+        llh : Likelihood
+            Initialized Likelihood object
+        """
         llh = Likelihood(
             kwargs['N_yr'],
             kwargs['galaxy_catalog'],
@@ -204,29 +216,6 @@ class Likelihood():
         for i in range(Defaults.NEbin):
             self.w_model_f1[i] = w_mean
         return
-
-    def computeAstrophysicalEventDistribution(self, N_re, writeMap):
-        """Compute the cross correlation distribution for astrophysical events"""
-
-        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
-        ns = self.neutrino_sample_class()
-        eg = self.event_generator
-
-        for iteration in tqdm(np.arange(N_re)):
-
-            trial, nexc = eg.SyntheticTrial(1000000, self.idx_mask, signal_only=True)
-
-            ns.inputTrial(trial, str(self.N_yr))
-            ns.updateMask(self.idx_mask)
-            self.inputData(ns, bootstrap_error=[])
-            w_cross[iteration] = self.w_data.copy()
-
-        self.w_model_f1 = np.mean(w_cross, axis=0)
-        self.w_model_f1_std = np.std(w_cross, axis=0)
-
-        if writeMap:
-            np.savetxt(self.AstroMeanFname, self.w_model_f1)
-            np.savetxt(self.AstroSTDFname, self.w_model_f1_std)
 
     def inputData(self, ns, bootstrap_niter=100, mp_cpus=1):
         """Input data
@@ -401,55 +390,6 @@ class Likelihood():
         null_x = len_f * [0] + [2.5]
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(null_x)) * 2
-
-    def TS_distribution(self, N_re, f_diff, astroModel='observed_numu_fraction', writeData=True):
-        """Generate a Test Statistic distribution for simulated trials
-
-        Parameters
-        ----------
-        N_re : `int`
-           Number of realizations to use
-        f_diff : `float`
-            Input value for signal fraction
-        writeData : `bool`
-            Write the TS distribution to a text file
-
-        Returns
-        -------
-        TS_array : `np.array`
-            The array of TS values
-        """
-        eg_2010 = EventGenerator('IC79-2010',   astroModel=astroModel)
-        eg_2011 = EventGenerator('IC86-2011',   astroModel=astroModel)
-        eg_2012 = EventGenerator('IC86-2012',   astroModel=astroModel)
-
-        TS_array = np.zeros(N_re)
-        for i in range(N_re):
-            if self.N_yr != 3:
-                datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2011.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2012.SyntheticData((self.N_yr - 1.)/2., f_diff=f_diff, density_nu=self.gs.density)
-            else:
-                datamap = eg_2010.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2011.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density) +\
-                    eg_2012.SyntheticData(1., f_diff=f_diff, density_nu=self.gs.density)
-            ns = self.neutrino_sample_class()
-            ns.inputCountsmap(datamap)
-            #ns.plotCountsmap(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Figcheck'))
-            self.inputData(ns)
-            minimizeResult = (self.minimize__lnL())
-            print(i, self.Ncount, minimizeResult[0], minimizeResult[-1])
-            TS_array[i] = minimizeResult[-1]
-        if writeData:
-            if f_diff == 0:
-                TSpath = Defaults.SYNTHETIC_TS_NULL_FORMAT.format(f_diff=str(f_diff),  galaxyName=self.gs.galaxyName,    nyear=str(self.N_yr))
-
-
-            else:
-                TSpath = Defaults.SYNTHETIC_TS_SIGNAL_FORMAT.format(f_diff=str(f_diff), galaxyName=self.gs.galaxyName, nyear=str(self.N_yr), astroModel=astroModel)
-
-            np.savetxt(TSpath, TS_array)
-        return TS_array
 
     def plotCastro(self, TS_threshold=4, coloralphalimit=0.01, colorfbin=500):
         """Make a 'Castro' plot of the likelihood
