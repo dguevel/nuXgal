@@ -22,7 +22,7 @@ setup(
     scripts=[],
     entry_points={'console_scripts': [
             'nuXgal_generateICIRFS = scripts.generateICIRFS:main',
-            'nuXgal = scripts.main'
+            'nuXgal = scripts.nuXgal:main'
             ]},
     install_requires=[
         'numpy >= 1.6.1',
