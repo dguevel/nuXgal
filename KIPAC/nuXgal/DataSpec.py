@@ -4,6 +4,7 @@ import csky as cy
 
 from . import Defaults
 
+
 def dataset_modifications_factory(ebinmin, ebinmax):
     def dataset_modifications(self, ds):
         sig = copy.deepcopy(ds.sig)
@@ -51,3 +52,4 @@ class data_spec_factory(object):
         self.ps_10yr = [self.IC40, self.IC59, self.IC79, self.IC86_2011, self.IC86v3_2012_2017]
         self.ps_v4 = [self.IC40, self.IC59, self.IC79, self.IC86v4]
         self.estes_10yr = [self.ESTES_10yr]
+        self.dnn_cascade_10yr = [self.DNNCascade]
