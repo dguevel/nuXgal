@@ -7,7 +7,7 @@ error = /scratch/dguevel/job_ebin0.err
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 initialdir = /data/user/dguevel/nuXgal/compute_std/unWISE_z0.4
-arguments = -n 100 -i 0 -o TS_$(Process).json --gamma 2.5 --galaxy-catalog unWISE_z=0.4 --lmin 1 --ebinmin 0 --ebinmax 3 --save-cls
+arguments = -n 100 -i 0 -o TS_$(Process).json --gamma 2.5 --galaxy-catalog unWISE_z=0.4 --lmin 1 --ebinmin 0 --ebinmax 4 --save-cls
 RequestMemory = 8000
 
 queue 1000
