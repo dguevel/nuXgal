@@ -20,7 +20,7 @@ from .plot_utils import FigureDict
 class NeutrinoSample():
     """Neutrino event sample class"""
 
-    def __init__(self):
+    def __init__(self, nyr='ps_v4'):
         """C'tor"""
         self.countsmap = None
         self.idx_mask = None
@@ -29,8 +29,10 @@ class NeutrinoSample():
         self._effective_area = None
 
         self.bl = np.zeros((Defaults.NEbin, Defaults.NCL))
+        self.bl_fnames = []
         for ebin in range(Defaults.NEbin):
-            bl_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+            bl_fname = Defaults.BEAM_FNAME_FORMAT.format(year=nyr, ebin=ebin)
+            self.bl_fnames.append(bl_fname)
             self.bl[ebin] = np.loadtxt(bl_fname)[:, 1]
 
     def inputTrial(self, trial):
@@ -244,7 +246,7 @@ class NeutrinoSample():
                 #hp.write_map(neutrino_weight_fname, weight)
 
                 # get beam file name
-                beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+                beam_fname = self.bl_fnames[ebin]
 
                 # run PolSpice
                 ispice(
@@ -339,7 +341,7 @@ class NeutrinoSample():
             #hp.write_map(neutrino_weight_fname, weight)
 
             # get beam file name
-            beam_fname = '/home/dguevel/git/nuXgal/data/ancil/PS_tracks_v4_ebin{}_beam.txt'.format(ebin)
+            beam_fname = self.bl_fnames[ebin]
 
             # run PolSpice
             ispice(

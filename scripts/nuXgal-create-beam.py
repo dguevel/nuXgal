@@ -40,7 +40,7 @@ def main():
 
     # iterate over energy bins
     beams = []
-    for elo, ehi in zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:]):
+    for ebin, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge, Defaults.map_logE_edge[1:])):
 
         probs = event_generator.trial_runner.sig_inj_probs
         psf = 0
@@ -91,9 +91,12 @@ def main():
             plot_fname = os.path.join(Defaults.NUXGAL_PLOT_DIR, plot_fname)
 
             plt.savefig(plot_fname, bbox_inches='tight')
+            plt.savefig(
+                plot_fname.replace('.png', '.pdf'), bbox_inches='tight')
 
-    fname = Defaults.BEAM_FNAME_FORMAT.format(year=args.nu_selection)
-    np.save(fname, beam)
+        fname = Defaults.BEAM_FNAME_FORMAT.format(
+            year=args.nu_selection, ebin=ebin)
+        np.save(fname, beam)
 
 if __name__ == "__main__":
     main()
