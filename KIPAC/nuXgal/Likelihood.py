@@ -21,7 +21,6 @@ from scipy.optimize import minimize
 from scipy.stats import norm, distributions
 from scipy.interpolate import interp1d
 
-from .EventGenerator import EventGenerator
 from . import Defaults
 from .NeutrinoSample import NeutrinoSample
 from .FermipyCastro import LnLFn
@@ -91,6 +90,10 @@ class Likelihood():
            indices of energy bins between which likelihood is computed
         lmin:
             minimum of l to be taken into account in likelihood
+        gamma : `float`
+            Spectral index of the neutrino flux
+        recompute_model : `bool`
+            If true, recompute the model. Best done on a cluster.
         """
 
         self.N_yr = N_yr
@@ -132,7 +135,7 @@ class Likelihood():
     def init_from_run(**kwargs):
         """
         Initialize a likelihood from JSON trial output
-        
+
         Parameters
         ----------
         **kwargs : dict
