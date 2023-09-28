@@ -304,12 +304,15 @@ class Likelihood():
         return np.sum(lnL_le)
 
     def chi_square_Ebin(self, f, energyBin):
-        w_model_mean = (self.w_model_f1[energyBin].T * f)
-        w_model_mean += (self.w_atm_mean[energyBin].T * (1 - f))
-        w_model_std_square = self.w_std_square[energyBin]
+        w_data = self.w_data[energyBin, self.lmin:]
 
-        chisquare = (self.w_data[energyBin] - w_model_mean) ** 2 / w_model_std_square
-        return np.sum(chisquare[self.lmin:])
+        w_model_mean = (self.w_model_f1[self.lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
+
+        w_std = self.w_std[energyBin, self.lmin:]
+
+        chisquare = (w_data - w_model_mean) ** 2 / w_std ** 2
+        return np.sum(chisquare)
 
     def minimize__lnL_analytic(self):
         len_f = self.Ebinmax - self.Ebinmin

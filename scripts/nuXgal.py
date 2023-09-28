@@ -207,7 +207,7 @@ def crosscorr_analysis(llh, trial, args):
     result_dict['f_fit'] = list(f_fit)
     result_dict['TS_i'] = [2*(llh.log_likelihood_Ebin(result_dict['f_fit'][i-llh.Ebinmin], i)-llh.log_likelihood_Ebin(0, i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
     result_dict['n_fit'] = list(result_dict['f_fit'] * llh.Ncount[llh.Ebinmin:llh.Ebinmax])
-    result_dict['chi_square'] = [-2*float(llh.log_likelihood_Ebin(f_fit[i-llh.Ebinmin], i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
+    result_dict['chi_square'] = [float(llh.chi_square_Ebin(f_fit[i-llh.Ebinmin], i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
 
     if args.save_cls:
         result_dict['cls'] = {}
