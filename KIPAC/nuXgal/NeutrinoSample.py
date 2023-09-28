@@ -33,7 +33,7 @@ class NeutrinoSample():
         for ebin in range(Defaults.NEbin):
             bl_fname = Defaults.BEAM_FNAME_FORMAT.format(year=nyr, ebin=ebin)
             self.bl_fnames.append(bl_fname)
-            self.bl[ebin] = np.loadtxt(bl_fname)[:, 1]
+            self.bl[ebin] = np.load(bl_fname)
 
     def inputTrial(self, trial):
         self.event_list = trial
