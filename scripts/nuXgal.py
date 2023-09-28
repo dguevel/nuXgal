@@ -56,7 +56,7 @@ def main():
                         help='Unblind the analysis')
     parser.add_argument('--estimator',
                         choices=['anafast', 'polspice'],
-                        default='polspice',
+                        default='anafast',
                         help='Estimator for cross correlation')
     args = parser.parse_args()
 
