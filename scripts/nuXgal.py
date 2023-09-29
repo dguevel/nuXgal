@@ -92,8 +92,6 @@ def main():
         trial, nexc = llh.event_generator.trial_runner.get_one_trial(TRUTH=True)
         results = {}
         results['dof'] = Defaults.MAX_L-llh.lmin-1
-        results['n_inj'] = n_inject
-        results['flux_inj'] = trial_runner.to_dNdE(n_inject, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
         results['gamma'] = args.gamma
         results['ebinmin'] = args.ebinmin
         results['ebinmax'] = args.ebinmax
