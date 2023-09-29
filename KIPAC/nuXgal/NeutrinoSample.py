@@ -125,14 +125,7 @@ class NeutrinoSample():
         w_auto = [hp.sphtfunc.anafast(overdensity[i]) / self.f_sky for i in range(Defaults.NEbin)]
         return w_auto
 
-
-    def getCrossCorrelationMaps(self, overdensityMap_g):
-        """Compute the cross correlation between the overdensity map and a counts map"""
-        overdensity = self.getOverdensity()
-        w_cross = [hp.sphtfunc.anafast(overdensity[i], overdensityMap_g) / self.f_sky for i in range(Defaults.NEbin)]
-        return w_cross
-
-    def getCrossCorrelation(self, galaxy_sample):
+    def getCrossCorrelation(self, galaxy_sample, acceptance=None):
         """Compute and return cross correlation between the overdensity map and a counts map
 
         Parameters
@@ -146,14 +139,17 @@ class NeutrinoSample():
             The cross correlation
         """
 
-        overdensity_nu = self.getOverdensity()
+        if acceptance is None:
+            acceptance = np.ones_like(self.countsmap)
+        countsmap = self.countsmap / acceptance
+        overdensity_nu = [countsmap[i] / countsmap[i].mean() - 1. for i in range(Defaults.NEbin)]
         overdensity_gal = galaxy_sample.overdensity
         w_cross = np.zeros((Defaults.NEbin, Defaults.NCL))
         for i in range(Defaults.NEbin):
             w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[i]
         return w_cross
 
-    def getCrossCorrelationEbin(self, galaxy_sample, ebin):
+    def getCrossCorrelationEbin(self, galaxy_sample, ebin, acceptance=None):
         """Compute and return cross correlation between the overdensity map and a counts map for one energy bin
 
         Parameters
@@ -166,8 +162,11 @@ class NeutrinoSample():
         w_cross : `np.ndarray`
             The cross correlation
         """
-
-        overdensity_nu = self.getOverdensity()
+        
+        if acceptance is None:
+            acceptance = np.ones_like(self.countsmap)
+        countsmap = self.countsmap / acceptance
+        overdensity_nu = [countsmap[i] / countsmap[i].mean() - 1. for i in range(Defaults.NEbin)]
         overdensity_gal = galaxy_sample.overdensity
         w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[ebin]
         return w_cross

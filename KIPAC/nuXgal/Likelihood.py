@@ -115,7 +115,24 @@ class Likelihood():
         )
 
         self.w_atm_mean = self.background_model.w_mean
-        self.w_model_f1 = self.gs.getAutoCorrelation()
+        self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
+        self.acceptance = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+        ra, dec = hp.pix2ang(Defaults.NSIDE, range(Defaults.NPIXEL), lonlat=True)
+        evts = cy.utils.Events({'ra': np.radians(ra), 'dec': np.radians(dec)})
+
+        for ebin in range(Defaults.NEbin):
+            elo = Defaults.map_logE_edge[ebin]
+            ehi = Defaults.map_logE_edge[ebin + 1]
+
+            for subana in self.event_generator.ana:
+                idx = subana.sig['log10energy'] >= elo
+                idx *= subana.sig['log10energy'] < ehi
+                sig_ebin = subana.sig[idx]
+                if len(sig_ebin) > 0:
+                    acc = cy.pdf.SinDecAccParameterization(sig_ebin)
+                    self.acceptance[ebin] += acc(evts, gamma=gamma)
+            
+        self.w_model_f1 = np.repeat(self.gs.getAutoCorrelation()[np.newaxis, :], 4, axis=0)
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
@@ -187,12 +204,12 @@ class Likelihood():
 
         if mp_cpus > 1:
             p = Pool(mp_cpus)
-            iterables = ((flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter))
+            iterables = ((flatevt, galaxy_sample, idx_mask, ebin, self.acceptance) for i in range(niter))
             cl = p.starmap(bootstrap_worker, iterables)
         else:
             cl = np.zeros((niter, Defaults.NCL))
             for i in tqdm(range(niter)):
-                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin)
+                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, self.acceptance)
         cl = np.array(cl)
 
         return np.std(cl, axis=0), np.cov(cl.T)
@@ -235,7 +252,7 @@ class Likelihood():
 
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        self.w_data = ns.getCrossCorrelation(self.gs)
+        self.w_data = ns.getCrossCorrelation(self.gs, acceptance=self.acceptance)
         self.Ncount = ns.getEventCounts()
 
         self.w_std = np.copy(self.w_atm_std)
@@ -265,7 +282,7 @@ class Likelihood():
 
         w_data = self.w_data[energyBin, self.lmin:]
 
-        w_model_mean = (self.w_model_f1[self.lmin:] * f)
+        w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
         w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
 
         w_std = self.w_std[energyBin, self.lmin:]
@@ -294,7 +311,7 @@ class Likelihood():
         for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
             w_data = self.w_data[ebin, self.lmin:]
 
-            w_model_mean = (self.w_model_f1[self.lmin:] * f[i])
+            w_model_mean = (self.w_model_f1[ebin, self.lmin:] * f[i])
             w_model_mean += (self.w_atm_mean[ebin, self.lmin:] * (1 - f[i]))
 
             w_std = self.w_std[ebin, self.lmin:]
@@ -306,7 +323,7 @@ class Likelihood():
     def chi_square_Ebin(self, f, energyBin):
         w_data = self.w_data[energyBin, self.lmin:]
 
-        w_model_mean = (self.w_model_f1[self.lmin:] * f)
+        w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
         w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
 
         w_std = self.w_std[energyBin, self.lmin:]
@@ -572,7 +589,7 @@ class Likelihood():
         fig = corner.corner(flat_samples, labels=labels, truths=truths)
         fig.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_MCMCcorner.pdf'))
 
-def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
+def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, acceptance):
 
     ns2 = NeutrinoSample()
     idx = np.random.choice(len(flatevt), size=len(flatevt))
@@ -584,5 +601,5 @@ def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
     #  the energy bin filter
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin)
+        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin, acceptance)
     return cl
