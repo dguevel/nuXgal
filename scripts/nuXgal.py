@@ -25,7 +25,7 @@ def main():
                         choices=['WISE', 'Planck', 'unWISE_z=0.4'],
                         default='unWISE_z=0.4')
     parser.add_argument('--nyear',
-                        default='v4',
+                        default='ps_v4',
                         help='PS Tracks version')
     parser.add_argument('--compute-std', action='store_true')
     parser.add_argument('--ebinmin',

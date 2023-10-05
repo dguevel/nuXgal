@@ -146,7 +146,7 @@ class NeutrinoSample():
         overdensity_gal = galaxy_sample.overdensity
         w_cross = np.zeros((Defaults.NEbin, Defaults.NCL))
         for i in range(Defaults.NEbin):
-            w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[i]
+            w_cross[i] = hp.sphtfunc.anafast(overdensity_nu[i], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky
         return w_cross
 
     def getCrossCorrelationEbin(self, galaxy_sample, ebin, acceptance=None):
@@ -162,13 +162,14 @@ class NeutrinoSample():
         w_cross : `np.ndarray`
             The cross correlation
         """
-        
+
         if acceptance is None:
             acceptance = np.ones_like(self.countsmap)
         countsmap = self.countsmap / acceptance
         overdensity_nu = [countsmap[i] / countsmap[i].mean() - 1. for i in range(Defaults.NEbin)]
         overdensity_gal = galaxy_sample.overdensity
-        w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky / self.bl[ebin]
+        pix_window = hp.pixwin(Defaults.NSIDE)
+        w_cross = hp.sphtfunc.anafast(overdensity_nu[ebin], overdensity_gal, lmax=Defaults.MAX_L) / self.f_sky# / self.bl[ebin] / pix_window ** 2
         return w_cross
 
     def getCrossCorrelationPolSpice(self, galaxy_sample, ana):

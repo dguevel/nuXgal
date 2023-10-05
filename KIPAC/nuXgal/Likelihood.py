@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel
 
 
 def significance(chi_square, dof):
@@ -115,26 +115,17 @@ class Likelihood():
         )
 
         self.w_atm_mean = self.background_model.w_mean
-        self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
-        self.acceptance = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
-        ra, dec = hp.pix2ang(Defaults.NSIDE, range(Defaults.NPIXEL), lonlat=True)
-        evts = cy.utils.Events({'ra': np.radians(ra), 'dec': np.radians(dec)})
-
-        for ebin in range(Defaults.NEbin):
-            elo = Defaults.map_logE_edge[ebin]
-            ehi = Defaults.map_logE_edge[ebin + 1]
-
-            for subana in self.event_generator.ana:
-                idx = subana.sig['log10energy'] >= elo
-                idx *= subana.sig['log10energy'] < ehi
-                sig_ebin = subana.sig[idx]
-                if len(sig_ebin) > 0:
-                    acc = cy.pdf.SinDecAccParameterization(sig_ebin)
-                    self.acceptance[ebin] += acc(evts, gamma=gamma)
-            
-        self.w_model_f1 = np.repeat(self.gs.getAutoCorrelation()[np.newaxis, :], 4, axis=0)
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
+
+        self.signal_model = TemplateSignalModel(
+            self.gs,
+            self.N_yr,
+            self.idx_mask,
+            recompute=recompute_model
+        )
+
+        self.w_model_f1 = self.signal_model.w_mean
 
     @property
     def event_generator(self):
@@ -204,12 +195,12 @@ class Likelihood():
 
         if mp_cpus > 1:
             p = Pool(mp_cpus)
-            iterables = ((flatevt, galaxy_sample, idx_mask, ebin, self.acceptance) for i in range(niter))
+            iterables = ((flatevt, galaxy_sample, idx_mask, ebin) for i in range(niter))
             cl = p.starmap(bootstrap_worker, iterables)
         else:
             cl = np.zeros((niter, Defaults.NCL))
             for i in tqdm(range(niter)):
-                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, self.acceptance)
+                cl[i] = bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin)
         cl = np.array(cl)
 
         return np.std(cl, axis=0), np.cov(cl.T)
@@ -252,7 +243,7 @@ class Likelihood():
 
         self.neutrino_sample = ns
         ns.updateMask(self.idx_mask)
-        self.w_data = ns.getCrossCorrelation(self.gs, acceptance=self.acceptance)
+        self.w_data = ns.getCrossCorrelation(self.gs)
         self.Ncount = ns.getEventCounts()
 
         self.w_std = np.copy(self.w_atm_std)
@@ -589,7 +580,7 @@ class Likelihood():
         fig = corner.corner(flat_samples, labels=labels, truths=truths)
         fig.savefig(os.path.join(Defaults.NUXGAL_PLOT_DIR, 'Fig_MCMCcorner.pdf'))
 
-def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, acceptance):
+def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin):
 
     ns2 = NeutrinoSample()
     idx = np.random.choice(len(flatevt), size=len(flatevt))
@@ -601,5 +592,5 @@ def bootstrap_worker(flatevt, galaxy_sample, idx_mask, ebin, acceptance):
     #  the energy bin filter
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin, acceptance)
+        cl = ns2.getCrossCorrelationEbin(galaxy_sample, ebin)
     return cl
