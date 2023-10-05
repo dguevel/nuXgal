@@ -50,7 +50,7 @@ def main():
     parser.add_argument('--lbin',
                         default=4,
                         type=int,
-                        help='Cross spectrum bin width')
+                        help='Cross spectrum bin width, only for PolSpice')
     parser.add_argument('--unblind',
                         action='store_true',
                         help='Unblind the analysis')
