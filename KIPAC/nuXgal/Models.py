@@ -49,7 +49,7 @@ class Model(object):
         std_exists = os.path.exists(self.w_std_fname)
         files_exist = mean_exists and std_exists
         if recompute or not files_exist:
-            self.calc_w_mean(N_re=20)
+            self.calc_w_mean(N_re=1000)
             if save_model:
                 self.save_model()
         else:
