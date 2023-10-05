@@ -34,6 +34,9 @@ setup(
         'healpy >= 1.12.0',
         'emcee',
         'corner',
+        'tqdm',
+        'csky',
+        'pandas'
     ],
     extras_require=dict(
         all=[],
