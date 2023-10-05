@@ -5,7 +5,10 @@ import scipy
 import healpy as hp
 import os
 import tempfile
-from ispice import ispice
+try:
+    from ispice import ispice
+except ImportError:
+    print("PolSpice not installed, experimental PolSpice cross correlation will raise error")
 from astropy.io import fits
 
 from . import Defaults

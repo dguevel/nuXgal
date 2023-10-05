@@ -11,7 +11,11 @@ import itertools
 import warnings
 from multiprocessing import Pool
 
-from bin_llcl import bin_llcl
+try:
+    from bin_llcl import bin_llcl
+except ImportError:
+    print("PolSpice not installed, experimental PolSpice cross correlation will raise error")
+
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
