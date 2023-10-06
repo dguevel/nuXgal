@@ -24,6 +24,7 @@ setup(
             'nuXgal_generateICIRFS = scripts.generateICIRFS:main',
             'nuXgal = scripts.nuXgal:main',
             'nuXgal-sensitivity = scripts.sensitivity:main',
+            'nuXgal-sensitivity-plot = scripts.sensitivity_plot:main',
             ]},
     install_requires=[
         'numpy >= 1.6.1',

@@ -9,6 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import histlite as hl
 import scipy.stats
+import json
 
 from KIPAC.nuXgal import Defaults
 from KIPAC.nuXgal.Likelihood import Likelihood
@@ -107,6 +108,51 @@ def plot_fit_bias(df, outputdir, ebin=0):
     plt.savefig(fname, bbox_inches='tight')
     plt.savefig(fname.replace('png', 'pdf'), bbox_inches='tight')
 
+def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebinmin=0, ebinmax=0):
+    n_inj = np.sort(np.unique(df['n_inj']))
+
+    if template:
+        ts_key = 'template_TS'
+    else:
+        ts_key = 'TS'
+
+    trials = {}
+    for n in n_inj:
+        trials[n] = df[ts_key][df['n_inj'] == n]
+
+    b = cy.dists.Chi2TSD(df[ts_key][df['n_inj'] == 0])
+
+    # do the sensitivity calculation using the csky function from trials
+    logemin = Defaults.map_logE_edge[ebinmin]
+    logemax = Defaults.map_logE_edge[ebinmax]
+    emid = 10 ** ((logemin + logemax) / 2) # in GeV
+    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials)
+    sens_n_sig = sensitivity['n_sig']
+    sens_flux = trial_runner.to_dNdE(sensitivity['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
+    print('Sensitivity: ', sens_flux)
+
+    # do the discovery potential calculation using the csky function from trials
+    #if np.all(df[ts_key] < b.isf_nsigma(5.)):
+    #    print('No trials with TS > 5 sigma. Setting discovery potential to 0.')
+    #    disc_flux = 0.0
+    #    disc_n_sig = 0.0
+    #else:
+    #    discovery = trial_runner.find_n_sig(b.isf_nsigma(5.), 0.5, tss=trials)
+    #    disc_flux = trial_runner.to_dNdE(discovery['n_sig'], E0=1e5, gamma=2.5) / (4 * np.pi * f_sky)
+    #    disc_n_sig = discovery['n_sig']
+    #print('Discovery potential: ', disc_flux)
+    disc_flux = 0.0
+    disc_n_sig = 0.0
+
+    output = {
+        'sens_flux': sens_flux,
+        'sens_n_sig': sens_n_sig,
+        'disc_flux': disc_flux,
+        'disc_n_sig': disc_n_sig,
+        'E0': emid,
+    }
+
+    return output
 
 def main():
     """Calculate sensitivity, discovery potential, fit bias, 
@@ -161,21 +207,31 @@ def main():
         Ebinmax=ebinmax,
         lmin=0)
 
-    trials = {}
-    for n in n_inj:
-        trials[n] = df['TS'][df['n_inj'] == n]
+    output_json = os.path.join(args.output, 'sensitivity_ebin{0:d}-{1:d}.json')
 
-    # do the sensitivity calculation using the csky function from trials
-    sensitivity = llh.event_generator.trial_runner.find_n_sig(b.median(), 0.9, tss=trials)
-    sens_flux = llh.event_generator.trial_runner.to_dNdE(sensitivity['n_sig'], E0=1e5, gamma=2.5) / (4 * np.pi * llh.f_sky)
-    print('Sensitivity: ', sens_flux)
+    output_json = output_json.format(ebinmin, ebinmax)
 
-    # do the discovery potential calculation using the csky function from trials
-    discovery = llh.event_generator.trial_runner.find_n_sig(b.isf_nsigma(5.), 0.5, tss=trials)
-    disc_flux = llh.event_generator.trial_runner.to_dNdE(discovery['n_sig'], E0=1e5, gamma=2.5) / (4 * np.pi * llh.f_sky)
-    print('Discovery potential: ', disc_flux)
+    cc_sens = calc_sensitivity(df, llh.event_generator.trial_runner, template=False, f_sky=llh.f_sky, gamma=args.gamma, ebinmin=ebinmin, ebinmax=ebinmax)
+    tmp_sens = calc_sensitivity(df, llh.event_generator.trial_runner, template=True, f_sky=llh.f_sky, gamma=args.gamma, ebinmin=ebinmin, ebinmax=ebinmax)
 
+    output_data = {}
+    output_data['sens_flux'] = float(cc_sens['sens_flux'])
+    output_data['sens_n_sig'] = float(cc_sens['sens_n_sig'])
+    output_data['disc_flux'] = float(cc_sens['disc_flux'])
+    output_data['disc_n_sig'] = float(cc_sens['disc_n_sig'])
+    output_data['E0'] = float(cc_sens['E0'])
+    output_data['template_sens_flux'] = float(tmp_sens['sens_flux'])
+    output_data['template_sens_n_sig'] = float(tmp_sens['sens_n_sig'])
+    output_data['template_disc_flux'] = float(tmp_sens['disc_flux'])
+    output_data['template_disc_n_sig'] = float(tmp_sens['disc_n_sig'])
+    output_data['ebinmin'] = int(ebinmin)
+    output_data['ebinmax'] = int(ebinmax)
+    output_data['logemin'] = float(Defaults.map_logE_edge[ebinmin])
+    output_data['logemax'] = float(Defaults.map_logE_edge[ebinmax])
+    output_data['gamma'] = float(args.gamma)
 
+    with open(output_json, 'w') as fp:
+        json.dump(output_data, fp, indent=4)
 
 
 if __name__ == '__main__':
