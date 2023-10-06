@@ -53,8 +53,8 @@ class CskyEventGenerator():
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
-            #self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
+            #self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
+            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
             self.ana.save(self.ana_dir)
 
         else:
