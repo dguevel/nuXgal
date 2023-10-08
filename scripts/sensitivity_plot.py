@@ -11,6 +11,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', nargs='+', help='Input files from sensitivity.py')
     parser.add_argument('-o', '--output', help='Output file', default='sensitivity-plot.pdf')
+    parser.add_argument('--no-template', action='store_true', help='Do not plot template sensitivity')
 
     args = parser.parse_args()
 
@@ -46,7 +47,8 @@ def main():
     tmp_sens_yerr = 0.2 * tmp_sens.to(yunit).value
 
     ax.errorbar(xmid.to(xunit).value, cc_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Sensitivity')
-    ax.errorbar(xmid.to(xunit).value, tmp_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
+    if not args.no_template:
+        ax.errorbar(xmid.to(xunit).value, tmp_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
 
     # single power law
     energy = np.linspace(15, 2000, 100) * u.TeV
