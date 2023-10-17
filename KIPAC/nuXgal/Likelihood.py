@@ -279,7 +279,7 @@ class Likelihood():
         w_std = self.w_std[energyBin, self.lmin:]
 
         lnL_le = norm.logpdf(
-            w_data, loc=w_model_mean, scale=w_std)
+            w_data, loc=w_model_mean, scale=w_std) * np.log10(np.e)
         return np.sum(lnL_le)
 
     def log_likelihood(self, f):
@@ -308,7 +308,7 @@ class Likelihood():
             w_std = self.w_std[ebin, self.lmin:]
 
             lnL_le += norm.logpdf(
-                w_data, loc=w_model_mean, scale=w_std)
+                w_data, loc=w_model_mean, scale=w_std) * np.log10(np.e)
         return np.sum(lnL_le)
 
     def chi_square_Ebin(self, f, energyBin):
