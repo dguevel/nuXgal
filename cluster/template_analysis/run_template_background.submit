@@ -1,0 +1,12 @@
+getenv = True
+executable = /home/dguevel/git/nuXgal/cluster/template_analysis/run_template_trials.py
+log = /scratch/dguevel/template_unwise.log
+output = /scratch/dguevel/template_unwise.out
+error = /scratch/dguevel/template_unwise.err
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+initialdir = /data/user/dguevel/nuXgal/template/bg_ts/
+arguments = -n 100 -i 0 -o TS_$(Process).npy --gamma 2.5
+RequestMemory = 8000
+
+queue 100

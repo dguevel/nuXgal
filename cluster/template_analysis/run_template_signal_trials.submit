@@ -1,0 +1,12 @@
+getenv = True
+executable = /home/dguevel/git/nuXgal/cluster/template_analysis/run_template_trials.py
+log = /scratch/dguevel/template_sig_unwise.log
+output = /scratch/dguevel/template_sig_unwise.out
+error = /scratch/dguevel/template_sig_unwise.err
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+initialdir = /data/user/dguevel/nuXgal/template/signal_trials/
+arguments = -n 10 -i 0 250 500 750 1000 1250 1500 2000 2250 2500 2750 3000 3500 4000 4500 5000 5500 6000 6500 7000 7500 8000 8500 9000 9500 10000 -o TS_$(Process).npy --gamma 2.5
+RequestMemory = 8000
+
+queue 100
