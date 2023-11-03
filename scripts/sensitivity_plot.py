@@ -15,9 +15,6 @@ def main():
 
     args = parser.parse_args()
 
-    xunit = u.GeV
-    yunit = u.GeV/u.cm**2/u.s/u.sr
-
     # load data
     print('Reading files...')
     data = []
@@ -25,6 +22,56 @@ def main():
         with open(fname) as f:
             print(f'Reading {fname}')
             data.append(json.load(f))
+
+    plot_ns_sensitivity(data, args)
+    plot_ereco_sensitivity(data, args)
+
+def plot_ns_sensitivity(data, args):
+
+    xunit = u.GeV
+
+    fig, ax = plt.subplots()
+
+    cc_sens = np.array([d['sens_n_sig'] for d in data])
+    tmp_sens = np.array([d['template_sens_n_sig'] for d in data])
+    munu_spl = np.array([d['munu_ns_spl'] for d in data])
+    munu_spl_err = np.array([d['munu_ns_spl_std'] for d in data])
+
+    xmid = []
+    xlo = []
+    xhi = []
+    for d in data:
+        xmid.append(d['E0'])
+        xlo.append(xmid[-1] - 10**d['logemin'])
+        xhi.append(10**d['logemax'] - xmid[-1])
+
+    xmid = np.array(xmid) * u.GeV
+    xerr = np.array([xlo, xhi]) * u.GeV
+    cc_sens = cc_sens
+    tmp_sens = tmp_sens
+    cc_sens_yerr = 0.2 * cc_sens
+    tmp_sens_yerr = 0.2 * tmp_sens
+
+    ax.errorbar(xmid.to(xunit).value, cc_sens, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Sensitivity')
+    if not args.no_template:
+        ax.errorbar(xmid.to(xunit).value, tmp_sens, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
+
+    ax.errorbar(xmid, munu_spl, yerr=munu_spl_err, fmt='o', color='C1', markersize=5, label=r'Diffuse $\nu_\mu$ power law')
+
+    ax.loglog()
+    ax.legend()
+    ax.set_xlabel(r'$E_{reco}$ / ' + xunit.to_string(format='latex_inline'))
+    ax.set_ylabel(r'Number of $\nu_\mu$')
+    ax.set_title('Sensitivity')
+
+    plt.savefig(args.output.replace('.', '_ns.'), bbox_inches='tight')
+
+
+
+def plot_ereco_sensitivity(data, args):
+
+    xunit = u.GeV
+    yunit = u.GeV/u.cm**2/u.s/u.sr
 
     fig, ax = plt.subplots()
 
@@ -67,7 +114,7 @@ def main():
 
     ax.loglog()
     ax.legend()
-    ax.set_xlabel(r'$E_\nu$ / ' + xunit.to_string(format='latex_inline'))
+    ax.set_xlabel(r'$E_{reco}$ / ' + xunit.to_string(format='latex_inline'))
     ax.set_ylabel(r'$E^2 \frac{dN}{dE}$ / ' + yunit.to_string(format='latex_inline'))
     ax.set_title('Sensitivity')
 

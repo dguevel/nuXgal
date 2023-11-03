@@ -73,6 +73,7 @@ def load_data(files):
     df = pd.DataFrame(data)
     return df
 
+
 def plot_sensitivity(sens, disc, ns, gamma=2.0, label='template', outputdir='.', ebin=0):
     """Plot sensitivity and discovery potential."""
     fig, ax = plt.subplots(dpi=100)
@@ -88,6 +89,7 @@ def plot_sensitivity(sens, disc, ns, gamma=2.0, label='template', outputdir='.',
     fname = os.path.join(outputdir, 'unwise_TS_sensitivity_ebin{}.png'.format(ebin))
     plt.savefig(fname, bbox_inches='tight')
     plt.savefig(fname.replace('png', 'pdf'), bbox_inches='tight')
+
 
 def plot_fit_bias(df, outputdir, ebin=0):
     fig, ax = plt.subplots(dpi=100)
@@ -128,7 +130,7 @@ def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebi
     logemin = Defaults.map_logE_edge[ebinmin]
     logemax = Defaults.map_logE_edge[ebinmax]
     emid = 10 ** ((logemin + logemax) / 2) # in GeV
-    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials)
+    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials, tol=np.inf)
     sens_n_sig = sensitivity['n_sig']
     sens_flux = trial_runner.to_dNdE(sensitivity['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
     print('Sensitivity: ', sens_flux)
@@ -205,7 +207,7 @@ def main():
     plot_chi2_distribution(df, args.output, 0, ebinmin, ebinmax)
     ninj = {0:1000, 1:1000, 2:250, 3:30}[ebinmin]
     plot_chi2_distribution(df, args.output, ninj, ebinmin, ebinmax)
-    return
+
     llh = Likelihood(
         'ps_v4',
         'unWISE_z=0.4',
@@ -236,6 +238,16 @@ def main():
     output_data['logemin'] = float(Defaults.map_logE_edge[ebinmin])
     output_data['logemax'] = float(Defaults.map_logE_edge[ebinmax])
     output_data['gamma'] = float(args.gamma)
+    output_data['munu_ns_spl'] = llh.event_generator.trial_runner.to_ns(
+        (1e5)**2 * 1.44e-18 * (4 * np.pi * llh.f_sky),
+        E0=1e5,
+        gamma=2.37
+    )
+    output_data['munu_ns_spl_std'] = llh.event_generator.trial_runner.to_ns(
+        (1e5)**2 * 0.25e-18 * (4 * np.pi * llh.f_sky),
+        E0=1e5,
+        gamma=2.37
+    )
 
     with open(output_json, 'w') as fp:
         json.dump(output_data, fp, indent=4)
