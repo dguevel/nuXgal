@@ -9,6 +9,7 @@ from .NeutrinoSample import NeutrinoSample
 import csky as cy
 import numpy as np
 from tqdm import tqdm
+import healpy as hp
 
 try:
     from classy import Class
@@ -151,8 +152,20 @@ class AnalyticSignalModel(Model):
 
         # get overdensity Cls
         cls_dens = LambdaCDM.density_cl(Defaults.MAX_L)
-        self.w_mean = cls_dens['dd'][0]
+
+        # load beam files
+        self.bl = np.zeros((Defaults.NEbin, Defaults.NCL))
+        self.bl_fnames = []
+        for ebin in range(Defaults.NEbin):
+            bl_fname = Defaults.BEAM_FNAME_FORMAT.format(year='ps_v4', ebin=ebin)
+            self.bl_fnames.append(bl_fname)
+            self.bl[ebin] = np.load(bl_fname)
+
+        pixwin = hp.pixwin(Defaults.NSIDE)
+        self.w_mean = cls_dens['dd'][0] * pixwin**2
+        self.w_mean = np.array([self.w_mean * self.bl[i] for i in range(Defaults.NEbin)])
         self.w_std = np.zeros_like(self.w_mean) * np.nan
+        self.w_std = np.array([self.w_std for i in range(Defaults.NEbin)])
 
 
 class DataScrambleBackgroundModel(Model):
