@@ -10,6 +10,11 @@ import csky as cy
 import numpy as np
 from tqdm import tqdm
 
+try:
+    from classy import Class
+except ImportError:
+    print('classy not installed, cannot compute analytic models but can load')
+
 
 class Model(object):
     """Base class for signal and background models"""
@@ -129,6 +134,44 @@ class TemplateSignalModel(TemplateModel):
 class TemplateBackgroundModel(TemplateModel):
     gamma = 3.7
 
+class AnalyticSignalModel(Model):
+    method_type = 'CLASS_analytic'
+    gamma = 2.5
+
+    def calc_w_mean(self, N_re=500, estimator='anafast', ana=None):
+        """Compute the mean cross-correlation function for the
+        signal model using analytic methods."""
+        # create instance of the class "Class"
+        LambdaCDM = Class()
+
+        # pass input parameters
+        LambdaCDM.set({
+            'omega_b': 0.0223828,
+            'omega_cdm': 0.1201075,
+            'h': 0.67810,
+            'A_s': 2.100549e-09,
+            'n_s': 0.9660499,
+            'tau_reio': 0.05430842,
+            'output': 'tCl,pCl,lCl,mPk,nCl',
+            'lensing': 'yes',
+            'P_k_max_1/Mpc': 3.0,
+            'l_max_lss': 1000,
+            'selection': 'gaussian',
+            'l_max_lss': Defaults.MAX_L,
+            # best match fit to galaxy autocorrelation function
+            # these parameters don't match measured dN/dz; idk why
+            'selection_mean': 0.16,
+            'selection_width': 0.01,
+            'selection_bias': 0.9
+        })
+
+        # run class
+        LambdaCDM.compute()
+
+        # get overdensity Cls
+        cls_dens = LambdaCDM.density_cl(Defaults.MAX_L)
+        self.w_mean = cls_dens['dd'][0]
+        self.w_std = np.zeros_like(self.w_mean) * np.nan
 
 class DataScrambleBackgroundModel(Model):
     method_type = 'data_scramble'
