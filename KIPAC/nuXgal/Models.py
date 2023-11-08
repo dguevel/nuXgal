@@ -86,24 +86,6 @@ class Model(object):
 
         return self.event_generator
 
-    '''
-    def calc_w_atm_std(self, N_re=500):
-        w_cross = np.zeros((N_re, Defaults.NEbin, 3 * Defaults.NSIDE))
-        ns = NeutrinoSample()
-        eg = self.get_event_generator()
-
-        for iteration in tqdm(np.arange(N_re)):
-
-            trial, _ = eg.SyntheticTrial(0, self.idx_mask)
-            ns.inputTrial(trial)
-            ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
-
-        self.w_atm_trials = w_cross.copy()
-        self.w_atm_mean = np.mean(w_cross, axis=0)
-        self.w_atm_std = np.std(w_cross, axis=0)
-    '''
-
 
 class TemplateModel(Model):
     method_type = 'template'
@@ -155,7 +137,6 @@ class AnalyticSignalModel(Model):
             'output': 'tCl,pCl,lCl,mPk,nCl',
             'lensing': 'yes',
             'P_k_max_1/Mpc': 3.0,
-            'l_max_lss': 1000,
             'selection': 'gaussian',
             'l_max_lss': Defaults.MAX_L,
             # best match fit to galaxy autocorrelation function
@@ -172,6 +153,7 @@ class AnalyticSignalModel(Model):
         cls_dens = LambdaCDM.density_cl(Defaults.MAX_L)
         self.w_mean = cls_dens['dd'][0]
         self.w_std = np.zeros_like(self.w_mean) * np.nan
+
 
 class DataScrambleBackgroundModel(Model):
     method_type = 'data_scramble'
