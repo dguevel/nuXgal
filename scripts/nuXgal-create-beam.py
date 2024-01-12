@@ -18,7 +18,7 @@ def main():
     parser.add_argument(
         'nu_selection',
         help='Neutrino selection to use',
-        choices=['ps_v4', 'estes_10yr', 'dnn_cascade_10yr']
+        choices=['ps_v4', 'estes_10yr', 'dnn_cascade_10yr', 'nt_v5']
     )
     parser.add_argument(
         '--save-plots',

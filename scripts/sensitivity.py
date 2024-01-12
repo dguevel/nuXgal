@@ -130,23 +130,24 @@ def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebi
     logemin = Defaults.map_logE_edge[ebinmin]
     logemax = Defaults.map_logE_edge[ebinmax]
     emid = 10 ** ((logemin + logemax) / 2) # in GeV
-    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials, tol=np.inf)
+    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials, tol=1)
     sens_n_sig = sensitivity['n_sig']
     sens_flux = trial_runner.to_dNdE(sensitivity['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
     print('Sensitivity: ', sens_flux)
 
     # do the discovery potential calculation using the csky function from trials
-    #if np.all(df[ts_key] < b.isf_nsigma(5.)):
-    #    print('No trials with TS > 5 sigma. Setting discovery potential to 0.')
-    #    disc_flux = 0.0
-    #    disc_n_sig = 0.0
-    #else:
-    #    discovery = trial_runner.find_n_sig(b.isf_nsigma(5.), 0.5, tss=trials)
-    #    disc_flux = trial_runner.to_dNdE(discovery['n_sig'], E0=1e5, gamma=2.5) / (4 * np.pi * f_sky)
-    #    disc_n_sig = discovery['n_sig']
-    #print('Discovery potential: ', disc_flux)
-    disc_flux = 0.0
-    disc_n_sig = 0.0
+    if np.all(df[ts_key] < b.isf_nsigma(5.)):
+        print('No trials with TS > 5 sigma. Setting discovery potential to 0.')
+        disc_flux = 0.0
+        disc_n_sig = 0.0
+    else:
+        discovery = trial_runner.find_n_sig(b.isf_nsigma(5.), 0.5, tss=trials, tol=1)
+        disc_flux = trial_runner.to_dNdE(discovery['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
+        disc_n_sig = discovery['n_sig']
+        if np.isinf(disc_n_sig):
+            disc_n_sig = 0.0
+            disc_flux = 0.0
+    print('Discovery potential: ', disc_flux)
 
     output = {
         'sens_flux': sens_flux,
@@ -164,6 +165,8 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('-i', '--input', nargs='+', help='Input files')
     parser.add_argument('-o', '--output', help='Output directory')
+    parser.add_argument('--nyr', help='Neutrino data to use', 
+                        choices=['ps_v4', 'nt_v5'])
     parser.add_argument('--ebinmin', help='Minimum energy bin', type=int)
     parser.add_argument('--ebinmax', help='Maximum energy bin', type=int)
     parser.add_argument('--gamma', help='Spectral index', type=float, default=2.5)
@@ -209,7 +212,7 @@ def main():
     plot_chi2_distribution(df, args.output, ninj, ebinmin, ebinmax)
 
     llh = Likelihood(
-        'ps_v4',
+        args.nyr,
         'unWISE_z=0.4',
         gamma=args.gamma,
         Ebinmin=ebinmin,

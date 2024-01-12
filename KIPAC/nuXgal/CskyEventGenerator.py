@@ -37,13 +37,15 @@ class CskyEventGenerator():
             'v4': data_specs.ps_v4,
             'ps_v4': data_specs.ps_v4,
             'estes_10yr': data_specs.estes_10yr,
-            'dnn_cascade_10yr': data_specs.dnn_cascade_10yr}[N_yr]
+            'dnn_cascade_10yr': data_specs.dnn_cascade_10yr,
+            'nt_v5': data_specs.nt_v5}[N_yr]
 
         version = {
             'v4': 'version-004-p02',
             'ps_v4': 'version-004-p02',
             'estes_10yr': 'version-001-p03',
-            'dnn_cascade_10yr': 'version-001-p01'}[N_yr]
+            'dnn_cascade_10yr': 'version-001-p01',
+            'nt_v5': 'version-005-p01'}[N_yr]
 
         density_nu = galaxy_sample.density.copy()
         density_nu[idx_mask[0]] = hp.UNSEEN
@@ -54,7 +56,7 @@ class CskyEventGenerator():
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
             #self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
-            self.ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, self.dataspec, analysis_region_template=~self.density_nu.mask)
+            self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, analysis_region_template=~self.density_nu.mask)
             self.ana.save(self.ana_dir)
 
         else:

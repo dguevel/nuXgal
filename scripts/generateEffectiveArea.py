@@ -8,7 +8,7 @@ import csky as cy
 import healpy as hp
 import numpy as np
 
-from KIPAC.nuXgal.DataSpec import ps_3yr, ps_10yr, ps_v4, estes_10yr
+from KIPAC.nuXgal.DataSpec import data_spec_factory
 from KIPAC.nuXgal.GalaxySample import GALAXY_LIBRARY
 from KIPAC.nuXgal import Defaults
 
@@ -17,15 +17,25 @@ def main():
     parser.add_argument('--nyr', default='10')
     args = parser.parse_args()
 
+    data_specs = data_spec_factory(0, 4)
     dataspec = {
-        '3': ps_3yr,
-        '10': ps_10yr,
-        'v4': ps_v4,
-        'estes_10': estes_10yr
-    }
+        3: data_specs.ps_3yr,
+        10: data_specs.ps_10yr,
+        'v4': data_specs.ps_v4,
+        'ps_v4': data_specs.ps_v4,
+        'estes_10yr': data_specs.estes_10yr,
+        'dnn_cascade_10yr': data_specs.dnn_cascade_10yr,
+        'nt_v5': data_specs.nt_v5}[args.nyr]
+
+    version = {
+        'v4': 'version-004-p02',
+        'ps_v4': 'version-004-p02',
+        'estes_10yr': 'version-001-p03',
+        'dnn_cascade_10yr': 'version-001-p01',
+        'nt_v5': 'version-005-p01'}[args.nyr]
 
     # set up csky analysis which does all the bookkeeping
-    ana = cy.get_analysis(cy.selections.repo, Defaults.ANALYSIS_VERSION, dataspec[args.nyr])
+    ana = cy.get_analysis(cy.selections.repo, version, dataspec)
 
     # for each sub-analysis calculate the exposure map
     exposuremap = np.zeros((Defaults.logE_microbin_edge.size - 1, Defaults.sindec_bin_edge.size - 1))

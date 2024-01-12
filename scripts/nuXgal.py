@@ -26,6 +26,7 @@ def main():
                         default='unWISE_z=0.4')
     parser.add_argument('--nyear',
                         default='ps_v4',
+                        choices=['ps_v4', 'nt_v5'],
                         help='PS Tracks version')
     parser.add_argument('--compute-std', action='store_true')
     parser.add_argument('--ebinmin',
