@@ -59,6 +59,8 @@ def main():
                         choices=['anafast', 'polspice'],
                         default='anafast',
                         help='Estimator for cross correlation')
+    parser.add_argument('--mcbg', action='store_true',
+                        help='Use MC background instead of data scramble')
     args = parser.parse_args()
 
     if args.estimator == 'polspice':
@@ -71,7 +73,7 @@ def main():
             lmin=args.lmin,
             gamma=args.gamma,
             err_type=args.err_type,
-            lbin=args.lbin)
+            lbin=args.lbin,)
     elif args.estimator == 'anafast':
         llh = Likelihood(
             N_yr=args.nyear,
@@ -80,7 +82,8 @@ def main():
             Ebinmin=args.ebinmin,
             Ebinmax=args.ebinmax,
             lmin=args.lmin,
-            gamma=args.gamma)
+            gamma=args.gamma,
+            mc_background=args.mcbg)
     else:
         raise ValueError('Not a valid estimator')
 

@@ -10,6 +10,7 @@ import csky as cy
 import numpy as np
 from tqdm import tqdm
 import healpy as hp
+from scipy.stats import gaussian_kde
 
 try:
     from classy import Class
@@ -75,7 +76,7 @@ class Model(object):
         self.w_mean = np.load(self.w_mean_fname)
         self.w_std = np.load(self.w_std_fname)
 
-    def get_event_generator(self):
+    def get_event_generator(self, mc_background=False):
         if not hasattr(self, 'event_generator'):
             self.event_generator = CskyEventGenerator(
                 self.N_yr,
@@ -83,7 +84,8 @@ class Model(object):
                 gamma=self.gamma,
                 Ebinmin=self.Ebinmin,
                 Ebinmax=self.Ebinmax,
-                idx_mask=self.idx_mask)
+                idx_mask=self.idx_mask,
+                mc_background=mc_background)
 
         return self.event_generator
 
@@ -191,6 +193,62 @@ class DataScrambleBackgroundModel(Model):
         self.w_trials = w_cross.copy()
         self.w_mean = np.mean(w_cross, axis=0)
         self.w_std = np.std(w_cross, axis=0)
+
+class MCBackgroundModel(Model):
+    method_type = 'mc_background'
+    gamma = 2.5
+
+    def calc_w_mean(self, N_re=500, estimator='anafast', ana=None):
+        from tqdm import tqdm
+
+        self.w_mean = np.zeros((Defaults.NEbin, Defaults.NCL))
+        nu_map = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+
+        eg = self.get_event_generator(mc_background=True)
+
+        gal_od = self.galaxy_sample.density.copy()
+        gal_od = hp.ma(gal_od)
+        gal_od = gal_od / np.mean(gal_od) - 1.
+
+        for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
+
+            mc = []
+            weight = []
+            for bg_inj in eg.trial_runner.bg_injs:
+                idx = (bg_inj.mc['log10energy'] >= elo) * (bg_inj.mc['log10energy'] < ehi)
+                mc.append(bg_inj.mc['sindec'][idx])
+                weight.append(bg_inj.probs[0][idx])
+
+            mc = np.concatenate(mc)
+            weight = np.concatenate(weight)
+            interp = gaussian_kde(mc, weights=weight)
+
+            npix = hp.nside2npix(Defaults.NSIDE)
+            pixels = np.arange(npix)
+            ra, dec = hp.pix2ang(Defaults.NSIDE, pixels, lonlat=True)
+            udec = np.unique(dec)
+            pixels = pixels.astype(float)
+
+            for udeci in tqdm(udec):
+                n = interp(np.sin(np.radians(udeci)))
+                pixels[np.where(dec == udeci)] = n[0]
+
+            #nu_od = pixels.copy()
+            #nu_od[Defaults.idx_muon] = hp.UNSEEN
+            #nu_od[gal_od < 0] = hp.UNSEEN
+            #nu_od = hp.ma(nu_od)
+            #nu_od = nu_od / np.mean(nu_od) - 1.
+
+            #self.w_mean[i] = hp.anafast(nu_od, gal_od, lmax=Defaults.MAX_L)
+            nu_map[i] = pixels.copy()
+                
+        ns = NeutrinoSample()
+        ns.inputCountsmap(nu_map)
+        ns.updateMask(self.idx_mask)
+        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample)
+
+
+        self.w_std = np.zeros_like(self.w_mean)
 
 
 class DataHistogramBackgroundModel(Model):

@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -75,7 +75,7 @@ class Likelihood():
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False):
         """C'tor
 
         Parameters
@@ -106,8 +106,16 @@ class Likelihood():
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
+        self.mc_background = mc_background
 
-        self.background_model = DataScrambleBackgroundModel(
+        #self.background_model = DataScrambleBackgroundModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model
+        #)
+
+        self.background_model = MCBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -136,7 +144,8 @@ class Likelihood():
                 gamma=self.gamma,
                 Ebinmin=self.Ebinmin,
                 Ebinmax=self.Ebinmax,
-                idx_mask=self.idx_mask)
+                idx_mask=self.idx_mask,
+                mc_background=self.mc_background)
         return self._event_generator
 
     @staticmethod

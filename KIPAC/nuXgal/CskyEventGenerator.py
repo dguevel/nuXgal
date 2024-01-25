@@ -20,7 +20,7 @@ class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
 
 
 class CskyEventGenerator():
-    def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None):
+    def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None, mc_background=False):
         self.galaxyName = galaxy_sample.galaxyName
         self.npix = Defaults.NPIXEL
         self.nside = Defaults.NSIDE
@@ -31,6 +31,7 @@ class CskyEventGenerator():
         self.idx_mask = idx_mask
 
         data_specs = data_spec_factory(Ebinmin, Ebinmax)
+
         self.dataspec = {
             3: data_specs.ps_3yr,
             10: data_specs.ps_10yr,
@@ -52,11 +53,15 @@ class CskyEventGenerator():
         density_nu = hp.ma(density_nu)
         self.density_nu = density_nu / density_nu.sum()
 
+        if mc_background:
+            for season in self.dataspec:
+                season._keep.append('conv')
+
         # temporary fix to avoid cluster file transfer problem
         uname = os.uname()
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            #self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
-            self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, analysis_region_template=~self.density_nu.mask)
+            self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=self.ana_dir, analysis_region_template=~self.density_nu.mask)
+            #self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, analysis_region_template=~self.density_nu.mask)
             self.ana.save(self.ana_dir)
 
         else:
@@ -73,9 +78,16 @@ class CskyEventGenerator():
                 DecRandomizer()
             ]
         }
+
         if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
             self.conf['dir'] = cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
-        self.trial_runner = cy.get_trial_runner(self.conf)
+
+        if mc_background:
+            inj_conf = {'bg_weight_names': ['conv']}
+            self.trial_runner = cy.get_trial_runner(self.conf, inj_conf=inj_conf)
+        else:
+            self.trial_runner = cy.get_trial_runner(self.conf)
+            
         self._filter_injector_events()
 
     def _filter_mask_events(self, trial):
@@ -100,8 +112,11 @@ class CskyEventGenerator():
             self.trial_runner.sig_injs[i].flux_weights[~idx] = 0.
 
         for i, injector in enumerate(self.trial_runner.bg_injs):
-            data = injector.data
-            idx = np.ones(len(injector.data), dtype=bool)
+            if isinstance(injector, cy.inj.MCBackgroundInjector):
+                data = injector.mc
+            else:
+                data = injector.data
+            idx = np.ones(len(data), dtype=bool)
 
             # no need for spatial filter since the events get RA scrambled
             # we have to remove them in each trial
