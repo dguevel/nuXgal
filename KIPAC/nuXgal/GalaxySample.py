@@ -40,7 +40,7 @@ class GalaxySample():
         self.f_sky = 1. - len(self.idx_galaxymask[0]) / float(Defaults.NPIXEL)
         galaxymap_path = Defaults.GALAXYMAP_FORMAT.format(galaxyName=galaxyName)
         #overdensityalm_path = Defaults.GALAXYALM_FORMAT.format(galaxyName=galaxyName)
-        self.galaxymap = hp.fitsfunc.read_map(galaxymap_path, verbose=False)
+        self.galaxymap = hp.fitsfunc.read_map(galaxymap_path)
         self.galaxymap[self.idx_galaxymask] = hp.UNSEEN
         self.galaxymap = hp.ma(self.galaxymap)
         self.overdensity = self.galaxymap / self.galaxymap.mean() - 1.
@@ -310,7 +310,7 @@ class GalaxySampleLibrary:
         analyCL = np.loadtxt(Defaults.ANALYTIC_CL_PATH)
         np.random.seed(self.randomseed_galaxy)
         alm = hp.sphtfunc.synalm(analyCL, lmax=Defaults.MAX_L)
-        density_g = hp.sphtfunc.alm2map(alm, Defaults.NSIDE, verbose=False)
+        density_g = hp.sphtfunc.alm2map(alm, Defaults.NSIDE)
         #density_g = hp.sphtfunc.synfast(analyCL, Defaults.NSIDE)
         density_g = np.exp(density_g)
         density_g /= density_g.sum()
