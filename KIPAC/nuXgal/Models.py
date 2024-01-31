@@ -194,6 +194,46 @@ class DataScrambleBackgroundModel(Model):
         self.w_mean = np.mean(w_cross, axis=0)
         self.w_std = np.std(w_cross, axis=0)
 
+
+class MCScrambleBackgroundModel(Model):
+    method_type = 'mc_scramble_background'
+    gamma = 2.5
+
+    def calc_w_mean(self, N_re=500, estimator='anafast', ana=None):
+        from tqdm import tqdm
+
+        self.w_mean = np.zeros((Defaults.NEbin, Defaults.NCL))
+        nu_map = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
+
+        eg = self.get_event_generator(mc_background=True)
+
+        for n in tqdm(np.arange(N_re)):
+            for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
+
+                ra = []
+                dec = []
+                weight = []
+                for bg_inj in eg.trial_runner.bg_injs:
+                    idx = (bg_inj.mc['log10energy'] >= elo) * (bg_inj.mc['log10energy'] < ehi)
+                    delta_ra = np.random.uniform(0, 2*np.pi, len(bg_inj.mc['ra'][idx]))
+                    ra.append(bg_inj.mc['ra'][idx] + delta_ra)
+                    dec.append(bg_inj.mc['dec'][idx])
+                    weight.append(bg_inj.probs[0][idx])
+
+                ra = np.concatenate(ra)
+                dec = np.concatenate(dec)
+                weight = np.concatenate(weight)
+                pixels = hp.ang2pix(Defaults.NSIDE, np.degrees(ra), np.degrees(dec), lonlat=True)
+                nu_map[i] += np.histogram(pixels, bins=Defaults.NPIXEL, weights=weight)[0]
+
+        ns = NeutrinoSample()
+        ns.inputCountsmap(nu_map)
+        ns.updateMask(self.idx_mask)
+        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample)
+
+        self.w_std = np.zeros_like(self.w_mean)
+
+
 class MCBackgroundModel(Model):
     method_type = 'mc_background'
     gamma = 2.5
@@ -205,10 +245,6 @@ class MCBackgroundModel(Model):
         nu_map = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
 
         eg = self.get_event_generator(mc_background=True)
-
-        gal_od = self.galaxy_sample.density.copy()
-        gal_od = hp.ma(gal_od)
-        gal_od = gal_od / np.mean(gal_od) - 1.
 
         for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
 
@@ -232,14 +268,6 @@ class MCBackgroundModel(Model):
             for udeci in tqdm(udec):
                 n = interp(np.sin(np.radians(udeci)))
                 pixels[np.where(dec == udeci)] = n[0]
-
-            #nu_od = pixels.copy()
-            #nu_od[Defaults.idx_muon] = hp.UNSEEN
-            #nu_od[gal_od < 0] = hp.UNSEEN
-            #nu_od = hp.ma(nu_od)
-            #nu_od = nu_od / np.mean(nu_od) - 1.
-
-            #self.w_mean[i] = hp.anafast(nu_od, gal_od, lmax=Defaults.MAX_L)
             nu_map[i] = pixels.copy()
                 
         ns = NeutrinoSample()

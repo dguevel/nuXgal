@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCBackgroundModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCScrambleBackgroundModel
 
 
 def significance(chi_square, dof):
@@ -115,7 +115,7 @@ class Likelihood():
         #    recompute=recompute_model
         #)
 
-        self.background_model = MCBackgroundModel(
+        self.background_model = MCScrambleBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -176,8 +176,8 @@ class Likelihood():
         for i, ebin in enumerate(range(llh.Ebinmin, llh.Ebinmax)):
             if isinstance(list(kwargs['cls'].keys())[i], str):
                 ebin = str(ebin)
-            llh.w_data[i] = kwargs['cls'][ebin]
-            llh.w_std[i] = kwargs['cls_std'][ebin]
+            llh.w_data[int(ebin)] = kwargs['cls'][ebin]
+            llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
 
         return llh
 
