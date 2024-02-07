@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCScrambleBackgroundModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel
 
 
 def significance(chi_square, dof):
@@ -108,14 +108,7 @@ class Likelihood():
         self.gamma = gamma
         self.mc_background = mc_background
 
-        #self.background_model = DataScrambleBackgroundModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model
-        #)
-
-        self.background_model = MCScrambleBackgroundModel(
+        self.background_model = DataScrambleBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -134,6 +127,7 @@ class Likelihood():
         )
 
         self.w_model_f1 = self.signal_model.w_mean
+        self.w_model_f1_std = self.signal_model.w_std
 
     @property
     def event_generator(self):
@@ -288,7 +282,7 @@ class Likelihood():
         w_std = self.w_std[energyBin, self.lmin:]
 
         lnL_le = norm.logpdf(
-            w_data, loc=w_model_mean, scale=w_std) * np.log10(np.e)
+            w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
 
     def log_likelihood(self, f):
@@ -317,7 +311,7 @@ class Likelihood():
             w_std = self.w_std[ebin, self.lmin:]
 
             lnL_le += norm.logpdf(
-                w_data, loc=w_model_mean, scale=w_std) * np.log10(np.e)
+                w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
 
     def chi_square_Ebin(self, f, energyBin):
