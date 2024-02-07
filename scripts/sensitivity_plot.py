@@ -161,6 +161,7 @@ def plot_ereco_sensitivity(data, args):
 
     ax.loglog()
     ax.legend()
+    ax.set_ylim(2e-9, 3e-6)
     ax.set_xlabel(r'$E_{reco}$ / ' + xunit.to_string(format='latex_inline'))
     ax.set_ylabel(r'$E^2 \frac{dN}{dE}$ / ' + yunit.to_string(format='latex_inline'))
     ax.set_title('Northern Tracks v5 Sensitivity')
