@@ -165,7 +165,10 @@ class GalaxySample_unWise_z04(GalaxySample):
         """Contstruct and return the mask for this sample"""
         c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (c_icrs.dec.degree < -5))
+        
+        planck_dustmap = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
+
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (c_icrs.dec.degree < -5) | (planck_dustmap == 0))
 
     def __init__(self):
         """C'tor"""
