@@ -18,7 +18,7 @@ import matplotlib
 from pandas import concat
 
 from scipy.optimize import minimize
-from scipy.stats import norm, distributions
+from scipy.stats import norm, distributions, multivariate_normal
 from scipy.interpolate import interp1d
 
 from . import Defaults
@@ -75,7 +75,7 @@ class Likelihood():
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False, fit_bounds=[0, 1]):
         """C'tor
 
         Parameters
@@ -107,6 +107,10 @@ class Likelihood():
         self.Ncount = None
         self.gamma = gamma
         self.mc_background = mc_background
+        if fit_bounds is not None:
+            self.fit_bounds = [fit_bounds] * (Ebinmax - Ebinmin)
+        else:
+            self.fit_bounds = None
 
         self.background_model = DataScrambleBackgroundModel(
             self.gs,
@@ -167,11 +171,13 @@ class Likelihood():
 
         llh.w_data = np.zeros((Defaults.NEbin, Defaults.NCL))
         llh.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
+        llh.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
         for i, ebin in enumerate(range(llh.Ebinmin, llh.Ebinmax)):
             if isinstance(list(kwargs['cls'].keys())[i], str):
                 ebin = str(ebin)
             llh.w_data[int(ebin)] = kwargs['cls'][ebin]
             llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
+            llh.w_cov[int(ebin)] = kwargs['cov'][ebin]
 
         return llh
 
@@ -313,6 +319,35 @@ class Likelihood():
             lnL_le += norm.logpdf(
                 w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
+    
+    def log_likelihood_cov(self, f):
+        """Compute the log of the likelihood for a particular model
+
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+
+        Returns
+        -------
+        logL : `float`
+            The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
+        """
+
+        f = np.array(f)
+
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_data = self.w_data[ebin, self.lmin:]
+
+            w_model_mean = (self.w_model_f1[ebin, self.lmin:] * f[i])
+            w_model_mean += (self.w_atm_mean[ebin, self.lmin:] * (1 - f[i]))
+
+            w_cov = self.w_cov[ebin, self.lmin:, self.lmin:]
+
+            lnL_le += multivariate_normal.logpdf(
+                w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
+        return lnL_le
 
     def chi_square_Ebin(self, f, energyBin):
         w_data = self.w_data[energyBin, self.lmin:]
@@ -355,8 +390,7 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood(*args)
         initial = 0.1 + 0.1 * np.random.randn(len_f)
-        soln = minimize(nll, initial, bounds=[(0, 1)] * (len_f))
-        #soln = minimize(nll, initial)
+        soln = minimize(nll, initial, bounds=self.fit_bounds)
 
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(np.zeros(len_f))) * 2
@@ -377,8 +411,7 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood_cov(*args)
         initial = 0.1 + 0.1 * np.random.randn(len_f)
-        soln = minimize(nll, initial, bounds=[(0, 1)] * (len_f))
-        #soln = minimize(nll, initial)
+        soln = minimize(nll, initial, bounds=self.fit_bounds)
 
         return soln.x, (self.log_likelihood_cov(soln.x) -\
                             self.log_likelihood_cov(np.zeros(len_f))) * 2
