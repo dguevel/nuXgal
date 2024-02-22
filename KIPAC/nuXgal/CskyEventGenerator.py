@@ -72,9 +72,6 @@ class CskyEventGenerator():
             ]
         }
 
-        if ('cobalt' in uname.nodename) or ('tyrell' in uname.nodename):
-            self.conf['dir'] = cy.utils.ensure_dir(os.path.join('{}', 'templates', self.galaxyName).format(self.ana_dir))
-
         if mc_background:
             inj_conf = {'bg_weight_names': ['conv']}
             self.trial_runner = cy.get_trial_runner(self.conf, inj_conf=inj_conf)
