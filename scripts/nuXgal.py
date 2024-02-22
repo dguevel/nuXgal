@@ -44,6 +44,9 @@ def main():
     parser.add_argument('--save-cls',
                         action='store_true',
                         help='Save cross spectrum')
+    parser.add_argument('--save-cov',
+                        action='store_true',
+                        help='Save covariance matrix')
     parser.add_argument('--bootstrap-niter', default=100, type=int)
     parser.add_argument('--err-type', default='bootstrap',
                         help='Error calculation method',
@@ -61,7 +64,13 @@ def main():
                         help='Estimator for cross correlation')
     parser.add_argument('--mcbg', action='store_true',
                         help='Use MC background instead of data scramble')
+    parser.add_argument('--fit-bounds', action='store_true')
     args = parser.parse_args()
+
+    if args.fit_bounds:
+        fit_bounds = [0, 1]
+    else:
+        fit_bounds = None
 
     if args.estimator == 'polspice':
         llh = PolSpiceLikelihood(
@@ -83,7 +92,8 @@ def main():
             Ebinmax=args.ebinmax,
             lmin=args.lmin,
             gamma=args.gamma,
-            mc_background=args.mcbg)
+            mc_background=args.mcbg,
+            fit_bounds=fit_bounds)
     else:
         raise ValueError('Not a valid estimator')
 
@@ -205,6 +215,7 @@ def crosscorr_analysis(llh, trial, args):
     llh.inputData(ns, bootstrap_niter=args.bootstrap_niter)
     result_dict = {}
 
+    #f_fit, result_dict['TS'] = llh.minimize__lnL_cov()
     f_fit, result_dict['TS'] = llh.minimize__lnL()
     result_dict['f_fit'] = list(f_fit)
     result_dict['TS_i'] = [2*(llh.log_likelihood_Ebin(result_dict['f_fit'][i-llh.Ebinmin], i)-llh.log_likelihood_Ebin(0, i)) for i in range(llh.Ebinmin, llh.Ebinmax)]
@@ -217,6 +228,11 @@ def crosscorr_analysis(llh, trial, args):
         for ebin in range(args.ebinmin, args.ebinmax):
             result_dict['cls'][ebin] = llh.w_data[ebin].tolist()
             result_dict['cls_std'][ebin] = llh.w_std[ebin].tolist()
+
+    if args.save_cov:
+        result_dict['cov'] = {}
+        for ebin in range(args.ebinmin, args.ebinmax):
+            result_dict['cov'][ebin] = llh.w_cov[ebin].tolist()
 
     return result_dict
 
