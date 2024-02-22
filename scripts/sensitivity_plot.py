@@ -33,9 +33,13 @@ def plot_ns_sensitivity(data, args):
     fig, ax = plt.subplots(dpi=150)
 
     cc_sens = np.array([d['sens_n_sig'] for d in data])
+    cc_sens_yerr = np.array([d['sens_n_sig_err'] for d in data])
     tmp_sens = np.array([d['template_sens_n_sig'] for d in data])
+    tmp_sens_yerr = np.array([d['template_sens_n_sig_err'] for d in data])
     cc_disc = np.array([d['disc_n_sig'] for d in data])
+    cc_disc_yerr = np.array([d['disc_n_sig_err'] for d in data])
     tmp_disc = np.array([d['template_disc_n_sig'] for d in data])
+    tmp_disc_yerr = np.array([d['template_disc_n_sig_err'] for d in data])
     munu_spl = np.array([d['munu_ns_spl'] for d in data])
     munu_spl_err = np.array([d['munu_ns_spl_std'] for d in data])
 
@@ -49,12 +53,10 @@ def plot_ns_sensitivity(data, args):
 
     xmid = np.array(xmid) * u.GeV
     xerr = np.array([xlo, xhi]) * u.GeV
-    cc_sens_yerr = 0.2 * cc_sens
-    tmp_sens_yerr = 0.2 * tmp_sens
 
-    ax.errorbar(xmid.to(xunit).value, cc_sens, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Sensitivity')
+    ax.errorbar(xmid.to(xunit).value, cc_sens, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', markersize=8, label='Cross Correlation Sensitivity')
     if not args.no_template:
-        ax.errorbar(xmid.to(xunit).value, tmp_sens, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
+        ax.errorbar(xmid.to(xunit).value, tmp_sens, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', markersize=5, label='Template Sensitivity')
 
     xmid = []
     xlo = []
@@ -66,21 +68,17 @@ def plot_ns_sensitivity(data, args):
 
     xmid = np.array(xmid) * u.GeV
     xerr = np.array([xlo, xhi]) * u.GeV
-    cc_sens = cc_disc
-    tmp_sens = tmp_disc
-    cc_sens_yerr = 0.2 * cc_sens
-    tmp_sens_yerr = 0.2 * tmp_sens
 
-    eb = ax.errorbar(xmid.to(xunit).value, cc_sens, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Discovery Potential')
+    eb = ax.errorbar(xmid.to(xunit).value, cc_disc, xerr=xerr.to(xunit).value, yerr=cc_disc_yerr, fmt='x', color='black', markersize=8, label='Cross Correlation Discovery Potential')
     eb[-1][0].set_linestyle('--')
     if not args.no_template:
-        eb = ax.errorbar(xmid.to(xunit).value, tmp_sens, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='.', color='C0', uplims=True, markersize=5, label='Template Discovery Potential')
+        eb = ax.errorbar(xmid.to(xunit).value, tmp_disc, xerr=xerr.to(xunit).value, yerr=tmp_disc_yerr, fmt='o', color='C0', markersize=5, label='Template Discovery Potential')
         eb[-1][0].set_linestyle('--')
 
     ax.errorbar(xmid, munu_spl, yerr=munu_spl_err, fmt='o', color='C1', markersize=5, label=r'Diffuse $\nu_\mu$ power law')
 
     ax.loglog()
-    ax.set_ylim(8, 15000)
+    ax.set_ylim(8, 20000)
     ax.legend(loc='lower left')
     ax.set_xlabel(r'$E_{reco}$ / ' + xunit.to_string(format='latex_inline'))
     ax.set_ylabel(r'Number of $\nu_\mu$')
@@ -99,7 +97,9 @@ def plot_ereco_sensitivity(data, args):
 
     # plot cross correlation sensitivity
     cc_sens = np.array([d['sens_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    cc_sens_yerr = np.array([d['sens_flux_err'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
     tmp_sens = np.array([d['template_sens_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    tmp_sens_err = np.array([d['template_sens_flux_err'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
     xmid = []
     xlo = []
     xhi = []
@@ -110,18 +110,20 @@ def plot_ereco_sensitivity(data, args):
 
     xmid = np.array(xmid) * u.GeV
     xerr = np.array([xlo, xhi]) * u.GeV
-    cc_sens = xmid**2 * cc_sens# * ((xmid / 100 / u.TeV).si)**(-2.5)
-    tmp_sens = xmid**2 * tmp_sens# * ((xmid / 100 / u.TeV).si)**(-2.5)
-    cc_sens_yerr = 0.2 * cc_sens.to(yunit).value
-    tmp_sens_yerr = 0.2 * tmp_sens.to(yunit).value
+    cc_sens = xmid**2 * cc_sens
+    tmp_sens = xmid**2 * tmp_sens
+    cc_sens_yerr = xmid**2 * cc_sens_yerr
+    tmp_sens_yerr = xmid**2 * tmp_sens_err
 
-    ax.errorbar(xmid.to(xunit).value, cc_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Sensitivity')
+    ax.errorbar(xmid.to(xunit).value, cc_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr.to(yunit).value, fmt='x', color='black', markersize=8, label='Cross Correlation Sensitivity')
     if not args.no_template:
-        ax.errorbar(xmid.to(xunit).value, tmp_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
+        ax.errorbar(xmid.to(xunit).value, tmp_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr.to(yunit).value, fmt='o', color='C0', markersize=5, label='Template Sensitivity')
 
     # plot cross correlation discovery potential
-    cc_sens = np.array([d['disc_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
-    tmp_sens = np.array([d['template_disc_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    cc_disc = np.array([d['disc_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    tmp_disc = np.array([d['template_disc_flux'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    cc_disc_yerr = np.array([d['disc_flux_err'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
+    tmp_disc_yerr = np.array([d['template_disc_flux_err'] for d in data]) / u.GeV / u.cm**2 / u.s / u.sr
     print(cc_sens, tmp_sens)
     xmid = []
     xlo = []
@@ -133,15 +135,15 @@ def plot_ereco_sensitivity(data, args):
 
     xmid = np.array(xmid) * u.GeV
     xerr = np.array([xlo, xhi]) * u.GeV
-    cc_sens = xmid**2 * cc_sens# * ((xmid / 100 / u.TeV).si)**(-2.5)
-    tmp_sens = xmid**2 * tmp_sens# * ((xmid / 100 / u.TeV).si)**(-2.5)
-    cc_sens_yerr = 0.2 * cc_sens.to(yunit).value
-    tmp_sens_yerr = 0.2 * tmp_sens.to(yunit).value
+    cc_disc = xmid**2 * cc_disc# * ((xmid / 100 / u.TeV).si)**(-2.5)
+    tmp_disc = xmid**2 * tmp_disc# * ((xmid / 100 / u.TeV).si)**(-2.5)
+    cc_disc_yerr = xmid**2 * cc_disc_yerr
+    tmp_disc_yerr = xmid**2 * tmp_disc_yerr
 
-    eb = ax.errorbar(xmid.to(xunit).value, cc_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=cc_sens_yerr, fmt='x', color='black', uplims=True, markersize=8, label='Cross Correlation Sensitivity')
+    eb = ax.errorbar(xmid.to(xunit).value, cc_disc.to(yunit).value, xerr=xerr.to(xunit).value, yerr=cc_disc_yerr.to(yunit).value, fmt='x', color='black', markersize=8, label='Cross Correlation Discovery Potential')
     eb[-1][0].set_linestyle('--')
     if not args.no_template:
-        eb = ax.errorbar(xmid.to(xunit).value, tmp_sens.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_sens_yerr, fmt='o', color='C0', uplims=True, markersize=5, label='Template Sensitivity')
+        eb = ax.errorbar(xmid.to(xunit).value, tmp_disc.to(yunit).value, xerr=xerr.to(xunit).value, yerr=tmp_disc_yerr.to(yunit).value, fmt='o', color='C0', markersize=5, label='Template Discovery Potential')
         eb[-1][0].set_linestyle('--')
 
     # single power law
@@ -161,7 +163,7 @@ def plot_ereco_sensitivity(data, args):
 
     ax.loglog()
     ax.legend()
-    ax.set_ylim(2e-9, 3e-6)
+    ax.set_ylim(2e-9, 4e-6)
     ax.set_xlabel(r'$E_{reco}$ / ' + xunit.to_string(format='latex_inline'))
     ax.set_ylabel(r'$E^2 \frac{dN}{dE}$ / ' + yunit.to_string(format='latex_inline'))
     ax.set_title('Northern Tracks v5 Sensitivity')

@@ -112,17 +112,66 @@ def plot_fit_bias(df, outputdir, ebin=0):
     plt.savefig(fname, bbox_inches='tight')
     plt.savefig(fname.replace('png', 'pdf'), bbox_inches='tight')
 
-def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebinmin=0, ebinmax=0):
+
+def find_n_sig(ts_dict, fraction, threshold):
+    # Sort the dictionary keys
+    sorted_keys = sorted(ts_dict.keys())
+
+    # Calculate the fraction of test statistics that pass the threshold for each signal level
+    fractions_passing_threshold = [np.sum(np.array(ts_dict[key]) > threshold) / len(ts_dict[key]) for key in sorted_keys]
+
+    # Create an interpolation function
+    interp_func = scipy.interpolate.interp1d(fractions_passing_threshold, sorted_keys, fill_value='extrapolate')
+
+    # Find the signal level at which the given fraction of test statistics passes the threshold
+    signal_level = interp_func(fraction)
+
+    return signal_level
+
+def make_ts_dict(df, ts_key='TS'):
     n_inj = np.sort(np.unique(df['n_inj']))
+    ts_dict = {}
+
+    for n in n_inj:
+        ts_dict[n] = np.array(df[ts_key][df['n_inj'] == n])
+
+    return ts_dict
+
+def bootstrap_array(arr):
+    return np.random.choice(arr, size=len(arr), replace=True)
+
+def sensitivity_err(df, fraction, type, nboot=10, ts_key='TS'):
+    sensitivity = np.zeros(nboot)
+    for i in tqdm(np.arange(nboot)):
+        ts_dict = make_ts_dict(df, ts_key=ts_key)
+        for key in ts_dict.keys():
+            ts_dict[key] = bootstrap_array(ts_dict[key])
+        if type == 'median':
+            threshold = cy.dists.Chi2TSD(ts_dict[0]).median()
+        elif type == '5sigma':
+            threshold = cy.dists.Chi2TSD(ts_dict[0]).isf_nsigma(5.)
+        else:
+            raise ValueError('Invalid type')
+        sensitivity[i] = find_n_sig(ts_dict, fraction, threshold)
+
+    result_dict = {
+        'n_sig': np.mean(sensitivity),
+        'n_sig_err': np.std(sensitivity),
+    }
+
+    return result_dict
+
+def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebinmin=0, ebinmax=0):
 
     if template:
         ts_key = 'template_TS'
     else:
         ts_key = 'TS'
 
-    trials = {}
-    for n in n_inj:
-        trials[n] = df[ts_key][df['n_inj'] == n]
+    if template:
+        ts_key = 'template_TS'
+    else:
+        ts_key = 'TS'
 
     b = cy.dists.Chi2TSD(df[ts_key][df['n_inj'] == 0])
 
@@ -130,9 +179,11 @@ def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebi
     logemin = Defaults.map_logE_edge[ebinmin]
     logemax = Defaults.map_logE_edge[ebinmax]
     emid = 10 ** ((logemin + logemax) / 2) # in GeV
-    sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials, tol=1)
+    #sensitivity = trial_runner.find_n_sig(b.median(), 0.9, tss=trials, tol=1)
+    sensitivity = sensitivity_err(df, 0.9, 'median', ts_key=ts_key)
     sens_n_sig = sensitivity['n_sig']
     sens_flux = trial_runner.to_dNdE(sensitivity['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
+    sens_flux_err = trial_runner.to_dNdE(sensitivity['n_sig_err'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
     print('Sensitivity: ', sens_flux)
 
     # do the discovery potential calculation using the csky function from trials
@@ -141,8 +192,9 @@ def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebi
         disc_flux = 0.0
         disc_n_sig = 0.0
     else:
-        discovery = trial_runner.find_n_sig(b.isf_nsigma(5.), 0.5, tss=trials, tol=1)
+        discovery = sensitivity_err(df, 0.5, type='5sigma', ts_key=ts_key)
         disc_flux = trial_runner.to_dNdE(discovery['n_sig'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
+        disc_flux_err = trial_runner.to_dNdE(discovery['n_sig_err'], E0=emid, gamma=gamma) / (4 * np.pi * f_sky)
         disc_n_sig = discovery['n_sig']
         if np.isinf(disc_n_sig):
             disc_n_sig = 0.0
@@ -151,9 +203,13 @@ def calc_sensitivity(df, trial_runner, template=False, f_sky=1.0, gamma=2.5, ebi
 
     output = {
         'sens_flux': sens_flux,
+        'sens_flux_err': sens_flux_err,
         'sens_n_sig': sens_n_sig,
+        'sens_n_sig_err': sensitivity['n_sig_err'],
         'disc_flux': disc_flux,
+        'disc_flux_err': disc_flux_err,
         'disc_n_sig': disc_n_sig,
+        'disc_n_sig_err': discovery['n_sig_err'],
         'E0': emid,
     }
 
@@ -229,13 +285,21 @@ def main():
     output_data = {}
     output_data['sens_flux'] = float(cc_sens['sens_flux'])
     output_data['sens_n_sig'] = float(cc_sens['sens_n_sig'])
+    output_data['sens_flux_err'] = float(cc_sens['sens_flux_err'])
+    output_data['sens_n_sig_err'] = float(cc_sens['sens_n_sig_err'])
     output_data['disc_flux'] = float(cc_sens['disc_flux'])
     output_data['disc_n_sig'] = float(cc_sens['disc_n_sig'])
+    output_data['disc_flux_err'] = float(cc_sens['disc_flux_err'])
+    output_data['disc_n_sig_err'] = float(cc_sens['disc_n_sig_err'])
     output_data['E0'] = float(cc_sens['E0'])
     output_data['template_sens_flux'] = float(tmp_sens['sens_flux'])
     output_data['template_sens_n_sig'] = float(tmp_sens['sens_n_sig'])
+    output_data['template_sens_flux_err'] = float(tmp_sens['sens_flux_err'])
+    output_data['template_sens_n_sig_err'] = float(tmp_sens['sens_n_sig_err'])
     output_data['template_disc_flux'] = float(tmp_sens['disc_flux'])
     output_data['template_disc_n_sig'] = float(tmp_sens['disc_n_sig'])
+    output_data['template_disc_flux_err'] = float(tmp_sens['disc_flux_err'])
+    output_data['template_disc_n_sig_err'] = float(tmp_sens['disc_n_sig_err'])
     output_data['ebinmin'] = int(ebinmin)
     output_data['ebinmax'] = int(ebinmax)
     output_data['logemin'] = float(Defaults.map_logE_edge[ebinmin])
