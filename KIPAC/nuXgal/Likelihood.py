@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel, GalaxyModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel
 
 
 def significance(chi_square, dof):
@@ -120,17 +120,11 @@ class Likelihood():
             recompute=recompute_model
         )
 
-        self.w_atm_mean = self.background_model.w_mean * 0
+        self.w_atm_mean = self.background_model.w_mean
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
-        #self.signal_model = TemplateSignalModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model
-        #)
-        self.signal_model = GalaxyModel(
+        self.signal_model = TemplateSignalModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -353,9 +347,8 @@ class Likelihood():
 
             w_cov = self.w_cov[ebin, self.lmin:, self.lmin:]
 
-            #lnL_le += multivariate_normal.logpdf(
-            #    w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
-            lnL_le += self.multivariate_normal[i].logpdf(w_data - w_model_mean)
+            lnL_le += multivariate_normal.logpdf(
+                w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
         return lnL_le
 
     def chi_square_Ebin(self, f, energyBin):
@@ -420,7 +413,6 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood_cov(*args)
         initial = 0.1 + 0.1 * np.random.randn(len_f)
-        self.multivariate_normal = [multivariate_normal(mean=np.zeros(Defaults.NCL-self.lmin), cov=self.w_cov[ebin, self.lmin:, self.lmin:]) for ebin in range(self.Ebinmin, self.Ebinmax)]
         soln = minimize(nll, initial, bounds=self.fit_bounds)
 
         return soln.x, (self.log_likelihood_cov(soln.x) -\
