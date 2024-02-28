@@ -88,6 +88,17 @@ class Model(object):
                 mc_background=mc_background)
 
         return self.event_generator
+    
+
+class GalaxyModel(Model):
+    method_type = 'galaxy'
+
+    def calc_w_mean(self, N_re=500):
+        fsky = 1 - len(self.idx_mask[0]) / Defaults.NPIXEL
+        w_cross = hp.anafast(self.galaxy_sample.overdensity, lmax=Defaults.MAX_L) / fsky
+        self.w_mean = np.array([w_cross for i in range(Defaults.NEbin)]) - 4 * np.pi * fsky / self.galaxy_sample.galaxymap.sum()
+        self.w_std = np.zeros_like(self.w_mean)
+
 
 
 class TemplateModel(Model):
