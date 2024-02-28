@@ -44,8 +44,7 @@ class GalaxySample():
         self.galaxymap[self.idx_galaxymask] = hp.UNSEEN
         self.galaxymap = hp.ma(self.galaxymap)
         self.overdensity = self.galaxymap / self.galaxymap.mean() - 1.
-        #self.overdensityalm = hp.map2alm(self.overdensity, lmax=Defaults.MAX_L)
-        #self.overdensityalm = hp.fitsfunc.read_alm(overdensityalm_path)
+        self.overdensityalm = hp.map2alm(self.overdensity, lmax=Defaults.MAX_L) / self.f_sky
         self.density = self.galaxymap / np.sum(self.galaxymap)
 
 
@@ -168,7 +167,7 @@ class GalaxySample_unWise_z04(GalaxySample):
         
         planck_dustmap = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
 
-        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (c_icrs.dec.degree < -5) | (planck_dustmap == 0))
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10))# | (c_icrs.dec.degree < -5))# | (planck_dustmap == 0))
 
     def __init__(self):
         """C'tor"""
