@@ -134,6 +134,11 @@ class Likelihood():
         self.w_model_f1 = self.signal_model.w_mean
         self.w_model_f1_std = self.signal_model.w_std
 
+        #self.w_cov = np.load('/home/dguevel/git/nuXgal/data/NTv5_cov_matrix.npy')
+        #self.w_std = np.array([np.sqrt(np.diag(self.w_cov[i])) for i in range(4)])
+        #self.w_std_square = self.w_std ** 2
+
+
     @property
     def event_generator(self):
         if self._event_generator is None:
@@ -347,8 +352,36 @@ class Likelihood():
 
             w_cov = self.w_cov[ebin, self.lmin:, self.lmin:]
 
-            lnL_le += multivariate_normal.logpdf(
-                w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
+            #lnL_le += multivariate_normal.logpdf(
+            #    w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
+            lnL_le += self.multi_norm[i].logpdf(w_data - w_model_mean)
+        return lnL_le
+
+
+    def log_likelihood_cov_Ebin(self, f, energyBin):
+        """Compute the log of the likelihood for a particular model
+
+        Parameters
+        ----------
+        f : `float`
+            The fraction of neutrino events correlated with the Galaxy sample
+
+        Returns
+        -------
+        logL : `float`
+            The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
+        """
+
+        w_data = self.w_data[energyBin, self.lmin:]
+
+        w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
+
+        w_cov = self.w_cov[energyBin, self.lmin:, self.lmin:]
+
+        #lnL_le = multivariate_normal.logpdf(
+        #    w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
+        lnL_le = self.multi_norm[energyBin].logpdf(w_data - w_model_mean)
         return lnL_le
 
     def chi_square_Ebin(self, f, energyBin):
@@ -413,6 +446,7 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood_cov(*args)
         initial = 0.1 + 0.1 * np.random.randn(len_f)
+        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:]) for i in range(self.Ebinmin, self.Ebinmax)]
         soln = minimize(nll, initial, bounds=self.fit_bounds)
 
         return soln.x, (self.log_likelihood_cov(soln.x) -\
