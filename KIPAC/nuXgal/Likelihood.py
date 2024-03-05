@@ -221,29 +221,6 @@ class Likelihood():
 
         return np.std(cl, axis=0), np.cov(cl.T)
 
-    def loadSTDInterpolation(self):
-        self.std_interps = {}
-        self.std_interps_n = {}
-        for ebin in range(Defaults.NEbin):
-            with open('/home/dguevel/git/nuXgal/syntheticData/w_std_unWISE_z=0.4_v4_ebin{}.json'.format(ebin)) as fp:
-                data = json.load(fp)
-
-            self.std_interps[ebin] = interp1d(data['f_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
-            self.std_interps_n[ebin] = interp1d(data['n_inj'], np.array([data['cl_std'][str(n)] for n in data['n_inj']]).T, fill_value='extrapolate', bounds_error=False)
-
-    def calculate_w_mean(self):
-        """Compute the mean cross corrleations assuming neutrino sources follow the same alm
-            Note that this is slightly different from the original Cl as the mask has been updated.
-        """
-
-        overdensity_g = hp.alm2map(self.gs.overdensityalm, nside=Defaults.NSIDE, verbose=False)
-        overdensity_g[self.idx_mask] = hp.UNSEEN
-        w_mean = hp.anafast(overdensity_g) / self.f_sky
-        self.w_model_f1 = np.zeros((Defaults.NEbin, Defaults.NCL))
-        for i in range(Defaults.NEbin):
-            self.w_model_f1[i] = w_mean
-        return
-
     def inputData(self, ns, bootstrap_niter=100, mp_cpus=1):
         """Input data
 
