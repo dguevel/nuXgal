@@ -166,8 +166,13 @@ class GalaxySample_unWise_z04(GalaxySample):
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
         
         planck_dustmap = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
+        lmc = hp.query_disc(128, hp.ang2vec(80.894200, -69.756100, lonlat=True), 5*np.pi/180)
+        smc = hp.query_disc(128, hp.ang2vec(13.158300, -72.800300, lonlat=True), 5*np.pi/180)
+        mc = np.zeros(Defaults.NPIXEL)
+        mc[lmc] = 1
+        mc[smc] = 1
 
-        return np.where((np.abs(c_icrs.galactic.b.degree) < 10))# | (c_icrs.dec.degree < -5))# | (planck_dustmap == 0))
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (planck_dustmap == 0) | (mc == 1))
 
     def __init__(self):
         """C'tor"""
