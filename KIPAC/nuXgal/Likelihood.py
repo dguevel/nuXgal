@@ -28,6 +28,7 @@ from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
 from .Models import DataScrambleBackgroundModel, TemplateSignalModel
+from .DataSpec import data_spec_factory
 
 
 def significance(chi_square, dof):
@@ -244,7 +245,8 @@ class Likelihood():
         self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
 
         for ebin in range(self.Ebinmin, self.Ebinmax):
-            self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
+            if bootstrap_niter > 0:
+                self.w_std[ebin], self.w_cov[ebin] = self.bootstrapSigma(ebin, niter=bootstrap_niter, mp_cpus=mp_cpus)
             self.w_std_square[ebin] = self.w_std[ebin]**2
 
     def log_likelihood_Ebin(self, f, energyBin):
@@ -453,6 +455,124 @@ class Likelihood():
         null_x = len_f * [0] + [2.5]
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(null_x)) * 2
+
+    def minimize__lnL_ns_gamma(self):
+        """Minimize the log-likelihood
+
+        Returns
+        -------
+        x : `array`
+            The parameters that minimize the log-likelihood
+        TS : `float`
+            The Test Statistic, computed as 2 * logL_x - logL_0
+        """
+
+        def minfunc(params):
+            ns, gamma = params
+            f = self.f_given_ns_gamma(ns, gamma)
+            return -self.log_likelihood(f)
+
+        ni = np.linspace(0, 10000, 100)
+        llhi = [self.log_likelihood_ns_gamma(n, 2.5) for n in ni]
+        initial = [ni[np.argmax(llhi)], 2.5]
+        bounds = [[0, None], [1, 4]]
+        soln = minimize(minfunc, initial, bounds=bounds)
+        return soln.x, (self.log_likelihood_ns_gamma(*soln.x) -\
+                            self.log_likelihood_ns_gamma(0, 2.5)) * 2
+
+    def log_likelihood_ns_gamma(self, ns, gamma):
+        """Compute the log of the likelihood for a particular model
+
+        Parameters
+        ----------
+        ns : `float`
+            The number of neutrino events
+        gamma : `float`
+            The spectral index of the neutrino flux
+
+        Returns
+        -------
+        logL : `float`
+            The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
+        """
+        f = self.f_given_ns_gamma(ns, gamma)
+        return self.log_likelihood(f)
+
+    def f_given_ns_gamma(self, ns, gamma):
+        """
+        Convert a given astrophysical neutrino count to a signal fraction in 
+        each energy bin with spectral index gamma
+        
+        Parameters
+        ----------
+        ns : `float`
+            The number of neutrino events
+        gamma : `float`
+            The spectral index of the neutrino flux
+
+        Returns
+        -------
+        f : `array`
+            The signal fraction in each energy bin
+        """
+        if not hasattr(self, '_event_generators'):
+            self._get_event_generators()
+        n_total = self.neutrino_sample.getEventCounts()
+        acc_total = self.acc_total(gamma)
+        acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        f = ns * acc_ebin / acc_total / n_total
+        return f
+
+    def _get_event_generators(self):
+        self._event_generators = []
+        for i in range(Defaults.NEbin):
+            eg = CskyEventGenerator(
+                self.N_yr,
+                self.gs,
+                gamma=self.gamma,
+                Ebinmin=i,
+                Ebinmax=i+1,
+                idx_mask=self.idx_mask,
+                mc_background=False)
+
+            self._event_generators.append(eg)
+
+    def acc_ebin(self, ebin, gamma):
+        return self._event_generators[ebin].trial_runner.get_acc_total(gamma=gamma)
+    
+    def acc_total(self, gamma):
+        return np.sum([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+
+    def _get_acc(self):
+        self._acceptances = []
+        self._n_total = []
+
+        for i in range(Defaults.NEbin):
+            data_specs = data_spec_factory(i, i + 1)
+
+            self.dataspec = {
+                3: data_specs.ps_3yr,
+                10: data_specs.ps_10yr,
+                'v4': data_specs.ps_v4,
+                'ps_v4': data_specs.ps_v4,
+                'estes_10yr': data_specs.estes_10yr,
+                'dnn_cascade_10yr': data_specs.dnn_cascade_10yr,
+                'nt_v5': data_specs.nt_v5}[self.N_yr]
+
+            version = {
+                'v4': 'version-004-p02',
+                'ps_v4': 'version-004-p02',
+                'estes_10yr': 'version-001-p03',
+                'dnn_cascade_10yr': 'version-001-p01',
+                'nt_v5': 'version-005-p01'}[self.N_yr]
+            anas = cy.get_analysis(cy.selections.repo, version, self.dataspec, analysis_region_template=~self.density_nu.mask)
+
+            self._n_total.append(np.sum([len(ana.data) for ana in anas]))
+            self._acceptances.append([])
+            for ana in anas:
+                evts = ana.sig
+                self._acceptances[-1].append(cy.pdf.SinDecAccParametrization(evts))
+            
 
     def plotCastro(self, TS_threshold=4, coloralphalimit=0.01, colorfbin=500):
         """Make a 'Castro' plot of the likelihood
