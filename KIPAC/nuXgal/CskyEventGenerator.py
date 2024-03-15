@@ -22,6 +22,30 @@ class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
 
 class CskyEventGenerator():
     def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None, mc_background=False):
+        """
+        Initialize the CskyEventGenerator object.
+
+        Parameters
+        ----------
+        N_yr : int
+            Number of years of data.
+        galaxy_sample : GalaxySample
+            Instance of the GalaxySample class.
+        gamma : float, optional
+            Spectral index for the power-law flux. Default is 2.
+        Ebinmin : int, optional
+            Minimum energy bin index. Default is 0.
+        Ebinmax : int, optional
+            Maximum energy bin index. Default is -1.
+        idx_mask : ndarray, optional
+            Mask for the density map. Default is None.
+        mc_background : bool, optional
+            Flag indicating whether to include Monte Carlo background. Default is False.
+
+        Returns
+        -------
+        None
+        """
         self.galaxyName = galaxy_sample.galaxyName
         self.npix = Defaults.NPIXEL
         self.nside = Defaults.NSIDE
@@ -80,7 +104,7 @@ class CskyEventGenerator():
             self.trial_runner = cy.get_trial_runner(self.conf, inj_conf=inj_conf)
         else:
             self.trial_runner = cy.get_trial_runner(self.conf)
-            
+
         self._filter_injector_events()
 
     def _filter_mask_events(self, trial):
@@ -126,6 +150,23 @@ class CskyEventGenerator():
         self.trial_runner = cy.get_trial_runner(self.conf)
 
     def SyntheticTrial(self, ninj, keep_total_constant=True, signal_only=False):
+        """
+        Perform a synthetic trial by generating events and optionally modifying them.
+
+        Parameters
+        ----------
+        ninj : int
+            The number of signal events to inject.
+        keep_total_constant : bool, optional
+            Whether to keep the total number of events constant by removing injected events.
+        signal_only : bool, optional
+            Whether to keep only the signal events by removing background events.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the modified events and the number of excess events.
+        """
         events, nexc = self.trial_runner.get_one_trial(ninj)
 
         if keep_total_constant:
@@ -138,7 +179,7 @@ class CskyEventGenerator():
                     tr.pop(0)  # remove non-signal events
 
         return events, nexc
-    
+
     def SyntheticTrialMCKDE(self):
         events = []
         if not hasattr(self, 'kdes'):

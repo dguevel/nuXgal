@@ -77,26 +77,30 @@ class Likelihood():
     neutrino_sample_class = NeutrinoSample
 
     def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False, fit_bounds=[0, 1]):
-        """C'tor
+        """
+        Initialize the Likelihood object.
 
         Parameters
         ----------
-        N_yr : `float`
-            Number of years to simulate if computing the models
-        galaxyName : `str`
-            Name of the Galaxy sample
-        computeSTD : `bool`
-            If true, compute the standard deviation for a number of trials
-        Ebinmin, Ebinmax : `int`
-           indices of energy bins between which likelihood is computed
-        lmin:
-            minimum of l to be taken into account in likelihood
-        gamma : `float`
-            Spectral index of the neutrino flux
-        recompute_model : `bool`
-            If true, recompute the model. Best done on a cluster.
+        N_yr : float
+            Number of years to simulate if computing the models.
+        galaxyName : str
+            Name of the Galaxy sample.
+        Ebinmin : int
+            Index of the minimum energy bin for likelihood computation.
+        Ebinmax : int
+            Index of the maximum energy bin for likelihood computation.
+        lmin : int
+            Minimum value of l to be taken into account in likelihood.
+        gamma : float, optional
+            Spectral index of the neutrino flux. Default is 2.5.
+        recompute_model : bool, optional
+            If True, recompute the model. Best done on a cluster. Default is False.
+        mc_background : bool, optional
+            If True, use Monte Carlo background model. Default is False.
+        fit_bounds : list, optional
+            List of fit bounds for each energy bin. Default is [0, 1].
         """
-
         self.N_yr = N_yr
         self.gs = GALAXY_LIBRARY.get_sample(galaxyName)
         self.anafastMask()
@@ -386,6 +390,22 @@ class Likelihood():
         return lnL_le
 
     def chi_square_Ebin(self, f, energyBin):
+        """
+        Calculate the chi-square value for a given energy bin.
+
+        Parameters:
+        ----------
+        f : float
+            The fraction of the model to use.
+        energyBin : int
+            The index of the energy bin.
+
+        Returns:
+        -------
+        float
+            The chi-square value.
+        """
+        """
         w_data = self.w_data[energyBin, self.lmin:]
 
         w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
@@ -397,6 +417,22 @@ class Likelihood():
         return np.sum(chisquare)
     
     def chi_square_cov_Ebin(self, f, energyBin):
+            """
+            Calculate the chi-square value for a given energy bin including
+            a covariance matrix.
+
+            Parameters
+            ----------
+            f : float
+                The fraction of the model to be used.
+            energyBin : int
+                The index of the energy bin.
+
+            Returns
+            -------
+            chi_square : float
+                The calculated chi-square value.
+            """
         w_data = self.w_data[energyBin, self.lmin:]
 
         w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
