@@ -4,6 +4,7 @@ import csky as cy
 from csky.inj import RARandomizer, DecRandomizer
 import healpy as hp
 import numpy as np
+from scipy.stats import gaussian_kde
 
 from . import Defaults
 from .DataSpec import data_spec_factory
@@ -26,6 +27,8 @@ class CskyEventGenerator():
         self.nside = Defaults.NSIDE
         self.ana_dir = Defaults.NUXGAL_ANA_DIR
         self.gamma = gamma
+        self.Ebinmin = Ebinmin
+        self.Ebinmax = Ebinmax
         self.log_emin = Defaults.map_logE_edge[Ebinmin]
         self.log_emax = Defaults.map_logE_edge[Ebinmax]
         self.idx_mask = idx_mask
@@ -135,6 +138,58 @@ class CskyEventGenerator():
                     tr.pop(0)  # remove non-signal events
 
         return events, nexc
+    
+    def SyntheticTrialMCKDE(self):
+        events = []
+        if not hasattr(self, 'kdes'):
+            self._make_kdes()
+
+        for i, elo in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            ehi = elo + 1
+            elo = Defaults.map_logE_edge[int(elo)]
+            ehi = Defaults.map_logE_edge[int(ehi)]
+
+            sindec = self.kdes[i].resample(self.nevents[i])[0]
+
+            # the kde doesn't hard cut at sindec = 1, so we have to resample until we get valid events
+            while np.any(np.abs(sindec) > 1):
+                idx = np.abs(sindec) > 1
+                sindec[idx] = self.kdes[i].resample(np.sum(idx))[0]
+            ra = np.random.uniform(0, 2 * np.pi, len(sindec))
+            log10energy = np.random.uniform(elo, ehi, len(sindec))
+            events.append([cy.utils.Events(ra=ra, dec=np.arcsin(sindec), log10energy=log10energy)])
+
+
+        return events
+
+    def _make_kdes(self):
+        self.nevents = np.zeros(self.Ebinmax - self.Ebinmin, dtype=int)
+
+        for i, elo in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            ehi = elo + 1
+            elo = Defaults.map_logE_edge[int(elo)]
+            ehi = Defaults.map_logE_edge[int(ehi)]
+
+            for ana in self.ana:
+                idx = (ana.data['log10energy'] >= elo) * (ana.data['log10energy'] < ehi)
+                self.nevents[i] += len(ana.data['log10energy'][idx])
+
+        self.kdes = []
+        for i, elo in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            ehi = elo + 1
+            elo = Defaults.map_logE_edge[int(elo)]
+            ehi = Defaults.map_logE_edge[int(ehi)]
+
+            mc = []
+            weight = []
+            for bg_inj in self.trial_runner.bg_injs:
+                idx = (bg_inj.mc['log10energy'] >= elo) * (bg_inj.mc['log10energy'] < ehi)
+                mc.append(bg_inj.mc['sindec'][idx])
+                weight.append(bg_inj.probs[0][idx])
+
+            mc = np.concatenate(mc)
+            weight = np.concatenate(weight)
+            self.kdes.append(gaussian_kde(mc, weights=weight))
 
     def _remove_to_keep_constant(self, trial):
         """Remove a number of atmospheric events equal to the number of signal events"""
