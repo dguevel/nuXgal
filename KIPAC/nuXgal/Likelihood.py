@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel
+from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCBackgroundModel
 from .DataSpec import data_spec_factory
 
 
@@ -114,7 +114,13 @@ class Likelihood():
         else:
             self.fit_bounds = None
 
-        self.background_model = DataScrambleBackgroundModel(
+        #self.background_model = DataScrambleBackgroundModel(
+        #    self.gs,
+        #    self.N_yr,
+        #    self.idx_mask,
+        #    recompute=recompute_model
+        #)
+        self.background_model = MCBackgroundModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
@@ -168,13 +174,20 @@ class Likelihood():
         llh : Likelihood
             Initialized Likelihood object
         """
+
+        if kwargs['fit_bounds']:
+            fit_bounds = [0, 1]
+        else:
+            fit_bounds = None
+
         llh = Likelihood(
             kwargs['N_yr'],
             kwargs['galaxy_catalog'],
             kwargs['ebinmin'],
             kwargs['ebinmax'],
             kwargs['lmin'],
-            gamma=kwargs['gamma'])
+            gamma=kwargs['gamma'],
+            fit_bounds=fit_bounds)
 
         llh.w_data = np.zeros((Defaults.NEbin, Defaults.NCL))
         llh.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
@@ -183,9 +196,18 @@ class Likelihood():
             if isinstance(list(kwargs['cls'].keys())[i], str):
                 ebin = str(ebin)
             llh.w_data[int(ebin)] = kwargs['cls'][ebin]
-            llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
+            if 'std' in kwargs:
+                llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
             if 'cov' in kwargs:
                 llh.w_cov[int(ebin)] = kwargs['cov'][ebin]
+
+        if 'countsmap' in kwargs:
+            ns = NeutrinoSample()
+            countsmap = np.array(kwargs['countsmap'])
+            countsmap[countsmap == None] = hp.UNSEEN
+            countsmap = hp.ma(countsmap)
+            ns.inputCountsmap(countsmap)
+            llh.inputData(ns, bootstrap_niter=0)
 
         return llh
 
@@ -373,6 +395,18 @@ class Likelihood():
 
         chisquare = (w_data - w_model_mean) ** 2 / w_std ** 2
         return np.sum(chisquare)
+    
+    def chi_square_cov_Ebin(self, f, energyBin):
+        w_data = self.w_data[energyBin, self.lmin:]
+
+        w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
+
+        w_cov = self.w_cov[energyBin, self.lmin:, self.lmin:]
+        z = w_data - w_model_mean
+        chi_square = np.matmul(z, np.linalg.solve(w_cov, z))
+
+        return chi_square
 
     def minimize__lnL_analytic(self):
         len_f = self.Ebinmax - self.Ebinmin
@@ -469,8 +503,7 @@ class Likelihood():
 
         def minfunc(params):
             ns, gamma = params
-            f = self.f_given_ns_gamma(ns, gamma)
-            return -self.log_likelihood(f)
+            return -self.log_likelihood_ns_gamma(ns, gamma)
 
         ni = np.linspace(0, 10000, 100)
         llhi = [self.log_likelihood_ns_gamma(n, 2.5) for n in ni]
@@ -496,7 +529,7 @@ class Likelihood():
             The log likelihood, computed as sum_l (data_l - f * model_mean_l) /  model_std_l
         """
         f = self.f_given_ns_gamma(ns, gamma)
-        return self.log_likelihood(f)
+        return self.log_likelihood_cov(f)
 
     def f_given_ns_gamma(self, ns, gamma):
         """
@@ -517,7 +550,7 @@ class Likelihood():
         """
         if not hasattr(self, '_event_generators'):
             self._get_event_generators()
-        n_total = self.neutrino_sample.getEventCounts()
+        n_total = self.Ncount
         acc_total = self.acc_total(gamma)
         acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
         f = ns * acc_ebin / acc_total / n_total
