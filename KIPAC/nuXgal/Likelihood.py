@@ -74,6 +74,7 @@ class Likelihood():
     AtmMeanFname = Defaults.SYNTHETIC_ATM_W_MEAN_FORMAT
     AstroMeanFname = Defaults.SYNTHETIC_ASTRO_W_MEAN_FORMAT
     AstroSTDFname = Defaults.SYNTHETIC_ASTRO_W_STD_FORMAT
+    WCovFname = Defaults.SYNTHETIC_W_COV_FORMAT
     neutrino_sample_class = NeutrinoSample
 
     def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False, fit_bounds=[0, 1]):
@@ -118,12 +119,6 @@ class Likelihood():
         else:
             self.fit_bounds = None
 
-        #self.background_model = DataScrambleBackgroundModel(
-        #    self.gs,
-        #    self.N_yr,
-        #    self.idx_mask,
-        #    recompute=recompute_model
-        #)
         self.background_model = MCBackgroundModel(
             self.gs,
             self.N_yr,
@@ -145,7 +140,7 @@ class Likelihood():
         self.w_model_f1 = self.signal_model.w_mean
         self.w_model_f1_std = self.signal_model.w_std
 
-        #self.w_cov = np.load('/home/dguevel/git/nuXgal/data/NTv5_cov_matrix.npy')
+        self.w_cov = np.load(self.WCovFname.format(nyear=self.N_yr, galaxyName=galaxyName))
         #self.w_std = np.array([np.sqrt(np.diag(self.w_cov[i])) for i in range(4)])
         #self.w_std_square = self.w_std ** 2
 
@@ -204,6 +199,8 @@ class Likelihood():
                 llh.w_std[int(ebin)] = kwargs['cls_std'][ebin]
             if 'cov' in kwargs:
                 llh.w_cov[int(ebin)] = kwargs['cov'][ebin]
+            else:
+                llh.w_cov = np.load(llh.WCovFname.format(nyear=kwargs['N_yr'], galaxyName=kwargs['galaxy_catalog']))
 
         if 'countsmap' in kwargs:
             ns = NeutrinoSample()
@@ -405,7 +402,7 @@ class Likelihood():
         float
             The chi-square value.
         """
-        """
+
         w_data = self.w_data[energyBin, self.lmin:]
 
         w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
@@ -417,22 +414,22 @@ class Likelihood():
         return np.sum(chisquare)
     
     def chi_square_cov_Ebin(self, f, energyBin):
-            """
-            Calculate the chi-square value for a given energy bin including
-            a covariance matrix.
+        """
+        Calculate the chi-square value for a given energy bin including
+        a covariance matrix.
 
-            Parameters
-            ----------
-            f : float
-                The fraction of the model to be used.
-            energyBin : int
-                The index of the energy bin.
+        Parameters
+        ----------
+        f : float
+            The fraction of the model to be used.
+        energyBin : int
+            The index of the energy bin.
 
-            Returns
-            -------
-            chi_square : float
-                The calculated chi-square value.
-            """
+        Returns
+        -------
+        chi_square : float
+            The calculated chi-square value.
+        """
         w_data = self.w_data[energyBin, self.lmin:]
 
         w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
@@ -442,6 +439,30 @@ class Likelihood():
         z = w_data - w_model_mean
         chi_square = np.matmul(z, np.linalg.solve(w_cov, z))
 
+        return chi_square
+
+    def chi_square_ns_gamma(self, ns, gamma):
+        """
+        Calculate the chi-square value for a given number of neutrino events
+        and spectral index.
+
+        Parameters
+        ----------
+        ns : float
+            The number of neutrino events.
+        gamma : float
+            The spectral index of the neutrino flux.
+
+        Returns
+        -------
+        chi_square : float
+            The calculated chi-square value.
+        """
+
+        f = self.f_given_ns_gamma(ns, gamma)
+        chi_square = 0
+        for i in range(self.Ebinmin, self.Ebinmax):
+            chi_square += self.chi_square_cov_Ebin(f[i], i)
         return chi_square
 
     def minimize__lnL_analytic(self):
@@ -526,8 +547,62 @@ class Likelihood():
         return soln.x, (self.log_likelihood(soln.x) -\
                             self.log_likelihood(null_x)) * 2
 
-    def minimize__lnL_ns_gamma(self):
+
+    def mle_ns_given_gamma(self, gamma):
+        a = self.w_data[:, self.lmin:]
+        b = self.w_model_f1[:, self.lmin:]
+        c = self.w_atm_mean[:, self.lmin:]
+        w_cov_inv = np.linalg.inv(self.w_cov[:, self.lmin:, self.lmin:])
+        acc_total = self.acc_total(gamma)
+        acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        k = acc_ebin / acc_total
+        N = self.Ncount.sum()
+        numerator = 0
+        denominator = 0
+        for i in range(self.Ebinmin, self.Ebinmax):
+            numerator += -k[i] * np.matmul(b[i] + c[i], np.matmul(w_cov_inv[i], (a[i] - b[i])))
+            denominator += k[i]**2 * np.matmul(b[i] + c[i], np.matmul(w_cov_inv[i], (b[i] + c[i])))
+
+        # restrict the domain of the solution to be positive
+        ns = max(0, N * numerator / denominator)
+        return ns
+
+    def minimize__lnL_ns_gamma_semi_analytic(self):
         """Minimize the log-likelihood
+
+        Returns
+        -------
+        x : `array`
+            The parameters that minimize the log-likelihood
+        TS : `float`
+            The Test Statistic, computed as 2 * logL_x - logL_0
+        """
+
+        def minfunc(params):
+
+            # the likelihood is quadratic in ns, so we can solve for the
+            # minimum analytically given a value for gamma
+            gamma = params[0]
+
+            ns = self.mle_ns_given_gamma(gamma)
+            self.semi_analytic_ns = ns
+
+            return -self.log_likelihood_ns_gamma(ns, gamma)
+
+        initial = [2.5]
+        bounds = [[1, 4]]
+        soln = minimize(minfunc, initial, bounds=bounds)
+        return [self.semi_analytic_ns, soln.x[0]], (self.log_likelihood_ns_gamma(self.semi_analytic_ns, *soln.x) -\
+                            self.log_likelihood_ns_gamma(0, 2.5)) * 2
+
+
+    def minimize__lnL_ns_gamma(self, method='Nelder-Mead'):
+        """Minimize the log-likelihood
+
+        Parameters
+        ----------
+        method : `str`
+            The optimization method to use; Nelder-Mead seems to work best
 
         Returns
         -------
@@ -541,11 +616,9 @@ class Likelihood():
             ns, gamma = params
             return -self.log_likelihood_ns_gamma(ns, gamma)
 
-        ni = np.linspace(0, 10000, 100)
-        llhi = [self.log_likelihood_ns_gamma(n, 2.5) for n in ni]
-        initial = [ni[np.argmax(llhi)], 2.5]
+        initial = [2000, 2.5]
         bounds = [[0, None], [1, 4]]
-        soln = minimize(minfunc, initial, bounds=bounds)
+        soln = minimize(minfunc, initial, bounds=bounds, method=method)
         return soln.x, (self.log_likelihood_ns_gamma(*soln.x) -\
                             self.log_likelihood_ns_gamma(0, 2.5)) * 2
 

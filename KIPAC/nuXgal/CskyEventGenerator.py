@@ -92,11 +92,6 @@ class CskyEventGenerator():
             'template': self.density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
             'sigsub': True,
-            'fast_weight': True,
-            'randomizers': [
-                RARandomizer(),
-                DecRandomizer()
-            ]
         }
 
         if mc_background:

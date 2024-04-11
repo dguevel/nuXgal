@@ -61,6 +61,7 @@ SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_at
 SYNTHETIC_ATM_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ASTRO_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_mean_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ASTRO_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_astro_std_{galaxyName}_{nyear}.txt')
+SYNTHETIC_W_COV_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_cov_{galaxyName}_{nyear}.npy')
 
 SYNTHETIC_TS_NULL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}.txt')
 SYNTHETIC_TS_SIGNAL_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'TS_{f_diff}_{galaxyName}_{nyear}_{astroModel}.txt')
