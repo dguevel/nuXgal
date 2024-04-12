@@ -122,6 +122,23 @@ class GalaxySample_Atmospheric(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "Atmospheric", self.mask())
 
+class GalaxySample_SDSS_03_04(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/boss_footprint.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "SDSS_z0.3_0.4", self.mask())
+
 
 class GalaxySample_Planck(GalaxySample):
     """Planck cosmic infrared background"""
@@ -281,7 +298,8 @@ class GalaxySampleLibrary:
         'unWISE_z=0.6': GalaxySample_unWise_z06,
         'unWISE_z=1.0': GalaxySample_unWise_z10,
         'unWISE_z=1.5': GalaxySample_unWise_z15,
-        'Atmospheric': GalaxySample_Atmospheric}
+        'Atmospheric': GalaxySample_Atmospheric,
+        'SDSS_z0.3_0.4': GalaxySample_SDSS_03_04}
 
     def __init__(self, randomseed_galaxy=Defaults.randomseed_galaxy):
         """C'tor"""
