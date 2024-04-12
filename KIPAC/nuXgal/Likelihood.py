@@ -140,9 +140,11 @@ class Likelihood():
         self.w_model_f1 = self.signal_model.w_mean
         self.w_model_f1_std = self.signal_model.w_std
 
-        self.w_cov = np.load(self.WCovFname.format(nyear=self.N_yr, galaxyName=galaxyName))
-        #self.w_std = np.array([np.sqrt(np.diag(self.w_cov[i])) for i in range(4)])
-        #self.w_std_square = self.w_std ** 2
+        self.cov_fname = self.WCovFname.format(nyear=self.N_yr, galaxyName=galaxyName)
+        if os.path.exists(self.cov_fname):
+            self.w_cov = np.load(self.cov_fname)
+        else:
+            self.w_cov = np.zeros((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
 
 
     @property
