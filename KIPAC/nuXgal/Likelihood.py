@@ -109,6 +109,7 @@ class Likelihood():
         self.Ebinmax = Ebinmax
         self.lmin = lmin
         self._event_generator = None
+        self._per_ebin_event_generators = None
         self.w_data = None
         self.Ncount = None
         self.gamma = gamma
@@ -159,6 +160,23 @@ class Likelihood():
                 idx_mask=self.idx_mask,
                 mc_background=self.mc_background)
         return self._event_generator
+    
+    @property
+    def per_ebin_event_generators(self):
+        if self._per_ebin_event_generators is None:
+            self._per_ebin_event_generators = []
+            for i in range(Defaults.NEbin):
+                eg = CskyEventGenerator(
+                    self.N_yr,
+                    self.gs,
+                    gamma=self.gamma,
+                    Ebinmin=i,
+                    Ebinmax=i+1,
+                    idx_mask=self.idx_mask,
+                    mc_background=False)
+
+                self._per_ebin_event_generators.append(eg)
+        return self._per_ebin_event_generators
 
     @staticmethod
     def init_from_run(**kwargs):
@@ -202,7 +220,11 @@ class Likelihood():
             if 'cov' in kwargs:
                 llh.w_cov[int(ebin)] = kwargs['cov'][ebin]
             else:
-                llh.w_cov = np.load(llh.WCovFname.format(nyear=kwargs['N_yr'], galaxyName=kwargs['galaxy_catalog']))
+                cov_fname = llh.WCovFname.format(nyear=kwargs['N_yr'], galaxyName=kwargs['galaxy_catalog'])
+                if os.path.exists(cov_fname):
+                    llh.w_cov = np.load(cov_fname)
+                else:
+                    llh.w_cov = np.ones((Defaults.NEbin, Defaults.NCL, Defaults.NCL))
 
         if 'countsmap' in kwargs:
             ns = NeutrinoSample()
@@ -381,10 +403,6 @@ class Likelihood():
         w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * f)
         w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * (1 - f))
 
-        w_cov = self.w_cov[energyBin, self.lmin:, self.lmin:]
-
-        #lnL_le = multivariate_normal.logpdf(
-        #    w_data, mean=w_model_mean, cov=w_cov, allow_singular=True)
         lnL_le = self.multi_norm[energyBin].logpdf(w_data - w_model_mean)
         return lnL_le
 
@@ -518,7 +536,11 @@ class Likelihood():
         len_f = self.Ebinmax - self.Ebinmin
         nll = lambda *args: -self.log_likelihood_cov(*args)
         initial = 0.1 + 0.1 * np.random.randn(len_f)
-        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:]) for i in range(self.Ebinmin, self.Ebinmax)]
+        #w_cov = self.w_cov[:, self.lmin:, self.lmin:].copy()
+        #for i in range(self.Ebinmin, self.Ebinmax):
+        #    w_cov[i] += np.eye(w_cov[i].shape[0]) * 1e-9
+        #self.multi_norm = [multivariate_normal(cov=w_cov[i], allow_singular=True) for i in range(self.Ebinmin, self.Ebinmax)]
+        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:], allow_singular=True) for i in range(self.Ebinmin, self.Ebinmax)]
         soln = minimize(nll, initial, bounds=self.fit_bounds)
 
         return soln.x, (self.log_likelihood_cov(soln.x) -\
@@ -568,34 +590,6 @@ class Likelihood():
         # restrict the domain of the solution to be positive
         ns = max(0, N * numerator / denominator)
         return ns
-
-    def minimize__lnL_ns_gamma_semi_analytic(self):
-        """Minimize the log-likelihood
-
-        Returns
-        -------
-        x : `array`
-            The parameters that minimize the log-likelihood
-        TS : `float`
-            The Test Statistic, computed as 2 * logL_x - logL_0
-        """
-
-        def minfunc(params):
-
-            # the likelihood is quadratic in ns, so we can solve for the
-            # minimum analytically given a value for gamma
-            gamma = params[0]
-
-            ns = self.mle_ns_given_gamma(gamma)
-            self.semi_analytic_ns = ns
-
-            return -self.log_likelihood_ns_gamma(ns, gamma)
-
-        initial = [2.5]
-        bounds = [[1, 4]]
-        soln = minimize(minfunc, initial, bounds=bounds)
-        return [self.semi_analytic_ns, soln.x[0]], (self.log_likelihood_ns_gamma(self.semi_analytic_ns, *soln.x) -\
-                            self.log_likelihood_ns_gamma(0, 2.5)) * 2
 
 
     def minimize__lnL_ns_gamma(self, method='Nelder-Mead'):
@@ -659,31 +653,15 @@ class Likelihood():
         f : `array`
             The signal fraction in each energy bin
         """
-        if not hasattr(self, '_event_generators'):
-            self._get_event_generators()
         n_total = self.Ncount
         acc_total = self.acc_total(gamma)
         acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
         f = ns * acc_ebin / acc_total / n_total
         return f
 
-    def _get_event_generators(self):
-        self._event_generators = []
-        for i in range(Defaults.NEbin):
-            eg = CskyEventGenerator(
-                self.N_yr,
-                self.gs,
-                gamma=self.gamma,
-                Ebinmin=i,
-                Ebinmax=i+1,
-                idx_mask=self.idx_mask,
-                mc_background=False)
-
-            self._event_generators.append(eg)
-
     def acc_ebin(self, ebin, gamma):
-        return self._event_generators[ebin].trial_runner.get_acc_total(gamma=gamma)
-    
+        return self.per_ebin_event_generators[ebin].trial_runner.get_acc_total(gamma=gamma)
+
     def acc_total(self, gamma):
         return np.sum([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
 

@@ -38,7 +38,7 @@ class data_spec_factory(object):
         self.IC86v4 = cy.selections.PSDataSpecs.IC86v4
         self.DNNCascade = cy.selections.DNNCascadeDataSpecs.DNNCascade_10yr
         self.ESTES_10yr = cy.selections.ESTESDataSpecs.ESTES_2011_2021
-        self.NT86v5 = cy.selections.NTDataSpecs.NT86v5
+        self.NT86v5p1 = cy.selections.NTDataSpecs.NT86v5p1
 
         self.IC40.dataset_modifications = dataset_modifications
         self.IC59.dataset_modifications = dataset_modifications
@@ -48,11 +48,11 @@ class data_spec_factory(object):
         self.IC86v4.dataset_modifications = dataset_modifications
         self.DNNCascade.dataset_modifications = dataset_modifications
         self.ESTES_10yr.dataset_modifications = dataset_modifications
-        self.NT86v5.dataset_modifications = dataset_modifications
+        self.NT86v5p1.dataset_modifications = dataset_modifications
 
         self.ps_3yr = [self.IC79, self.IC86_2011, self.IC86v3_2012_2017]
         self.ps_10yr = [self.IC40, self.IC59, self.IC79, self.IC86_2011, self.IC86v3_2012_2017]
         self.ps_v4 = [self.IC40, self.IC59, self.IC79, self.IC86v4]
         self.estes_10yr = [self.ESTES_10yr]
         self.dnn_cascade_10yr = [self.DNNCascade]
-        self.nt_v5 = [self.NT86v5]
+        self.nt_v5 = [self.NT86v5p1]

@@ -122,6 +122,67 @@ class GalaxySample_Atmospheric(GalaxySample):
         """C'tor"""
         GalaxySample.__init__(self, "Atmospheric", self.mask())
 
+
+class GalaxySample_SDSS_00_01(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.0_0.1_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.05
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.0_0.1", self.mask())
+
+
+class GalaxySample_SDSS_01_02(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.1_0.2_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.15
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.1_0.2", self.mask())
+
+
+class GalaxySample_SDSS_02_03(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.2_0.3_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.25
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.2_0.3", self.mask())
+
+
 class GalaxySample_SDSS_03_04(GalaxySample):
     """SDSS galaxy sample
 
@@ -132,12 +193,233 @@ class GalaxySample_SDSS_03_04(GalaxySample):
         """Contstruct and return the mask for this sample"""
         c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
-        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/boss_footprint.fits')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.3_0.4_mask.fits')
         return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
 
     def __init__(self):
         """C'tor"""
+        self.z = 0.35
+        self.dz = 0.1
         GalaxySample.__init__(self, "SDSS_z0.3_0.4", self.mask())
+
+
+class GalaxySample_SDSS_04_05(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.4_0.5_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.45
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.4_0.5", self.mask())
+
+
+class GalaxySample_SDSS_05_06(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.5_0.6_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.55
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.5_0.6", self.mask())
+
+
+class GalaxySample_SDSS_06_07(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.6_0.7_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.65
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.6_0.7", self.mask())
+
+
+class GalaxySample_SDSS_07_08(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.7_0.8_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.75
+        self.dz = 0.1
+        GalaxySample.__init__(self, "SDSS_z0.7_0.8", self.mask())
+
+
+class GalaxySample_SDSS_08_10(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z0.8_1.0_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 0.9
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z0.8_1.0", self.mask())
+
+
+class GalaxySample_SDSS_10_12(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z1.0_1.2_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 1.1
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z1.0_1.2", self.mask())
+
+
+class GalaxySample_SDSS_12_14(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z1.2_1.4_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 1.3
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z1.2_1.4", self.mask())
+
+
+class GalaxySample_SDSS_14_16(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z1.4_1.6_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 1.5
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z1.4_1.6", self.mask())
+
+
+class GalaxySample_SDSS_16_18(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z1.6_1.8_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 1.7
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z1.6_1.8", self.mask())
+
+
+class GalaxySample_SDSS_18_20(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z1.8_2.0_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 1.9
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z1.8_2.0", self.mask())
+
+class GalaxySample_SDSS_20_22(GalaxySample):
+    """SDSS galaxy sample
+
+    SDSS galaxy sample map based on ~1M galaxies
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        sdss_footprint = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/SDSS_z2.0_2.2_mask.fits')
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (sdss_footprint == 0))
+
+    def __init__(self):
+        """C'tor"""
+        self.z = 2.1
+        self.dz = 0.2
+        GalaxySample.__init__(self, "SDSS_z2.0_2.2", self.mask())
 
 
 class GalaxySample_Planck(GalaxySample):
@@ -299,7 +581,21 @@ class GalaxySampleLibrary:
         'unWISE_z=1.0': GalaxySample_unWise_z10,
         'unWISE_z=1.5': GalaxySample_unWise_z15,
         'Atmospheric': GalaxySample_Atmospheric,
-        'SDSS_z0.3_0.4': GalaxySample_SDSS_03_04}
+        'SDSS_z0.0_0.1': GalaxySample_SDSS_00_01,
+        'SDSS_z0.1_0.2': GalaxySample_SDSS_01_02,
+        'SDSS_z0.2_0.3': GalaxySample_SDSS_02_03,
+        'SDSS_z0.3_0.4': GalaxySample_SDSS_03_04,
+        'SDSS_z0.4_0.5': GalaxySample_SDSS_04_05,
+        'SDSS_z0.5_0.6': GalaxySample_SDSS_05_06,
+        'SDSS_z0.6_0.7': GalaxySample_SDSS_06_07,
+        'SDSS_z0.7_0.8': GalaxySample_SDSS_07_08,
+        'SDSS_z0.8_1.0': GalaxySample_SDSS_08_10,
+        'SDSS_z1.0_1.2': GalaxySample_SDSS_10_12,
+        'SDSS_z1.2_1.4': GalaxySample_SDSS_12_14,
+        'SDSS_z1.4_1.6': GalaxySample_SDSS_14_16,
+        'SDSS_z1.6_1.8': GalaxySample_SDSS_16_18,
+        'SDSS_z1.8_2.0': GalaxySample_SDSS_18_20,
+        'SDSS_z2.0_2.2': GalaxySample_SDSS_20_22}
 
     def __init__(self, randomseed_galaxy=Defaults.randomseed_galaxy):
         """C'tor"""

@@ -34,7 +34,13 @@ NUXGAL_DATA_DIR = os.path.join(NUXGAL_DIR, 'data', 'data')
 NUXGAL_SYNTHETICDATA_DIR = os.path.join(NUXGAL_DIR, 'syntheticData')
 NUXGAL_PLOT_DIR = os.path.join(NUXGAL_DIR, 'plots')
 TESTFIG_DIR = os.path.join(NUXGAL_PLOT_DIR, 'test')
-NUXGAL_ANA_DIR = os.path.join(NUXGAL_DIR, 'data', 'ana')
+#NUXGAL_ANA_DIR = os.path.join(NUXGAL_DIR, 'data', 'ana')
+NUXGAL_ANA_ROOT = '/data/user/dguevel/nuXgal/ana'
+NUXGAL_TEMPLATE_ROOT = os.path.join(NUXGAL_ANA_ROOT, 'templates')
+NUXGAL_ANA_DIR = os.path.join(NUXGAL_ANA_ROOT, '{nyear}_{galaxyName}_ebin{emin}-{emax}')
+NUXGAL_TEMPLATE_DIR = os.path.join(NUXGAL_TEMPLATE_ROOT, '{nyear}_{galaxyName}_ebin{emin}-{emax}')
+NUXGAL_ANA_FORMAT = os.path.join(NUXGAL_ANA_DIR, 'NT86v5.subanalysis.version-005-p01.npy')
+NUXGAL_TEMPLATE_FORMAT = os.path.join(NUXGAL_TEMPLATE_DIR, 'NT86v5.template.npy')
 
 # Format strings for file paths
 NCOSTHETA_FORMAT = os.path.join(NUXGAL_IRF_DIR, 'Ncos_theta_{year}_{ebin}.txt')

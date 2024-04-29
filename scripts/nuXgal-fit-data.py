@@ -30,15 +30,17 @@ def main():
         for data in tqdm(json_data):
             result_dict = data
             data['lmin'] = args.lmin
-            llh = Likelihood.init_from_run(**data)
-            llh.Ncount = np.zeros(Defaults.NEbin)
-            for ebin in range(Defaults.NEbin):
-                llh.Ncount[ebin] = data['n_total_i'][str(ebin)]
-            if _event_generators:
-                llh._event_generators = _event_generators
+            if 'llh' not in locals():
+                llh = Likelihood.init_from_run(**data)
+                llh.Ncount = np.zeros(Defaults.NEbin)
+                for ebin in range(Defaults.NEbin):
+                    llh.Ncount[ebin] = data['n_total_i'][str(ebin)]
             else:
-                llh._get_event_generators()
-                _event_generators = llh._event_generators
+                llh.w_data = np.zeros((llh.Ebinmax - llh.Ebinmin, Defaults.NCL))
+                for j, ebin in enumerate(range(data['ebinmin'], data['ebinmax'])):
+                    llh.w_data[j] = np.array(data['cls'][str(ebin)])
+
+                llh.Ncount = np.array([data['n_total_i'][str(ebin)] for ebin in range(Defaults.NEbin)])
 
             f_fit, result_dict["TS"] = llh.minimize__lnL_cov()
             result_dict["f_fit"] = f_fit.tolist()

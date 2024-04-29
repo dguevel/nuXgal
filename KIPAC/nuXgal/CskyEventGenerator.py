@@ -84,14 +84,20 @@ class CskyEventGenerator():
             for season in self.dataspec:
                 season._keep.append('conv')
 
+        ana_dir = cy.utils.ensure_dir(Defaults.NUXGAL_ANA_DIR.format(nyear=N_yr, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
+        template_dir = cy.utils.ensure_dir(Defaults.NUXGAL_TEMPLATE_DIR.format(nyear=N_yr, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
+
+        self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=ana_dir, analysis_region_template=~self.density_nu.mask)
         # temporary fix to avoid cluster file transfer problem
-        uname = os.uname()
-        self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, analysis_region_template=~self.density_nu.mask)
+        if 'cobalt' in os.uname().nodename:
+            self.ana.save(ana_dir)
+
         self.conf = {
             'ana': self.ana,
             'template': self.density_nu.copy(),
             'flux': cy.hyp.PowerLawFlux(self.gamma),
             'sigsub': True,
+            'dir': cy.utils.ensure_dir(template_dir)
         }
 
         if mc_background:
