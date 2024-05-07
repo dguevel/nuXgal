@@ -5,10 +5,32 @@ from argparse import ArgumentParser
 import numpy as np
 from tqdm import tqdm
 import json
+import csky as cy
+import pandas as pd
 
 from KIPAC.nuXgal.Likelihood import Likelihood
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal import Defaults
+
+def point_source_trial_runner(ra, dec, gamma, ana):
+    src = cy.sources(ra, dec, deg=True)
+    cy.CONF['ana'] = ana
+    cy.CONF['flux'] = cy.hyp.PowerLawFlux(gamma=gamma)
+    trial_runner = cy.get_trial_runner(src=src)
+    return trial_runner
+
+def append_signal_trials(trial1, trial2):
+    """Append signal events from trial 2 to trial 1."""
+    n_seasons = len(trial1)
+    for i in range(n_seasons):
+        if len(trial2[i]) > 1:
+            if len(trial1[i]) > 1:
+                trial1[i][1]['energy'] = 10**trial1[i][1]['log10energy']
+                trial2[i][1]['energy'] = 10**trial2[i][1]['log10energy']
+                trial1[i][1] = cy.utils.Events.concatenate((trial1[i][1], trial2[i][1]))
+            else:
+                trial1[i].append(trial2[i][1])
+    return trial1
 
 def find_n_inj_per_bin(trial, ebinmin, ebinmax):
     """
@@ -65,6 +87,10 @@ def main():
                         help='Save covariance matrix')
     parser.add_argument('--recompute-model', action='store_true',
                         help='Recompute model')
+    parser.add_argument('--pnt-src', nargs=4, type=float,
+                        help='Add a point source at RA Dec with a flux and spectrum index')
+    parser.add_argument('--pnt-srcs', type=str,
+                        help='CSV file containing point source information')
 
     args = parser.parse_args()
 
@@ -85,12 +111,35 @@ def main():
         mc_background=args.mcbg,
         recompute_model=args.recompute_model)
 
+    if args.pnt_src:
+        ra, dec, flux_pt, gamma = args.pnt_src
+        pnt_trial_runner = point_source_trial_runner(
+            ra, dec, gamma, llh.event_generator.ana)
+        ninj_pt = int(pnt_trial_runner.to_ns(flux_pt, E0=1, unit=1e3))
+
+    if args.pnt_srcs:
+        pnt_srcs = pd.read_csv(args.pnt_srcs)
+        pnts_trial_runners = []
+        ninj_pts = []
+        for idx, row in pnt_srcs.iterrows():
+            ra, dec, flux_pt = row['RA'], row['Dec'], row['Flux']
+            pnts_trial_runners.append(point_source_trial_runner(
+                ra, dec, 2.5, llh.event_generator.ana))
+            ninj_pts.append(int(pnts_trial_runners[-1].to_ns(flux_pt, E0=1, unit=1e3)))
+
     result_list = []
 
     for ninj in args.inject:
         for i in tqdm(np.arange(args.n_trials)):
-            trial, nexc = llh.event_generator.SyntheticTrial(
-                ninj, keep_total_constant=False)
+            trial = llh.event_generator.SyntheticTrial(
+                ninj, keep_total_constant=False)[0]
+            if args.pnt_src:
+                pt_trial = pnt_trial_runner.get_one_trial(ninj_pt)[0]
+                trial = append_signal_trials(trial, pt_trial)
+            if args.pnt_srcs:
+                for n, ptr in zip(ninj_pts, pnts_trial_runners):
+                    pts_trial = ptr.get_one_trial(n)[0]
+                    trial = append_signal_trials(trial, pts_trial)
             ns = NeutrinoSample()
             ns.inputTrial(trial)
             llh.inputData(ns, bootstrap_niter=args.bootstrap_niter)
