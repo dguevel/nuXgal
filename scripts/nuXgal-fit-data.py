@@ -21,15 +21,20 @@ def main():
     parser.add_argument("-i", "--input", nargs="+", help="JSON files to load")
     parser.add_argument("-o", "--output", help="Output file name")
     parser.add_argument("--lmin", default=1, type=int, help="Minimum multipole to use")
+    parser.add_argument("--gamma", default=2.5, type=float, help="Fit model spectral index")
+    parser.add_argument("--path-sig", default='', help='Path to MC data set for fitting')
+
     args = parser.parse_args()
 
     result_list = []
-    _event_generators = None
     for file in args.input:
         json_data = load_json_file(file)
         for data in tqdm(json_data):
             result_dict = data
             data['lmin'] = args.lmin
+            data['gamma'] = args.gamma
+            data['mc_background'] = True
+            data['path_sig'] = args.path_sig
             if 'llh' not in locals():
                 llh = Likelihood.init_from_run(**data)
                 llh.Ncount = np.zeros(Defaults.NEbin)

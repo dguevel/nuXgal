@@ -91,6 +91,8 @@ def main():
                         help='Add a point source at RA Dec with a flux and spectrum index')
     parser.add_argument('--pnt-srcs', type=str,
                         help='CSV file containing point source information')
+    parser.add_argument('--path-sig', type=str, default='',
+                        help='Path to MC signal file if not using default')
 
     args = parser.parse_args()
 
@@ -109,7 +111,8 @@ def main():
         gamma=args.gamma,
         fit_bounds=fit_bounds,
         mc_background=args.mcbg,
-        recompute_model=args.recompute_model)
+        recompute_model=args.recompute_model,
+        path_sig=args.path_sig)
 
     if args.pnt_src:
         ra, dec, flux_pt, gamma = args.pnt_src

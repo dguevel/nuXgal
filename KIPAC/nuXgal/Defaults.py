@@ -60,8 +60,8 @@ GALAXYMAP_FIG_FORMAT =  os.path.join(NUXGAL_PLOT_DIR, 'test_{galaxyName}_galaxy.
 SYNTHETIC_EVTMAP_ASTRO_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_astro{i}.fits')
 SYNTHETIC_EVTMAP_ATM_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'eventmap_atm{i}.fits')
 
-SYNTHETIC_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_mean_{galaxyName}_{nyear}_{method}.npy')
-SYNTHETIC_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_std_{galaxyName}_{nyear}_{method}.npy')
+SYNTHETIC_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_mean_{galaxyName}_{nyear}_{method}_gamma{gamma}.npy')
+SYNTHETIC_W_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_std_{galaxyName}_{nyear}_{method}_gamma{gamma}.npy')
 SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_std_{galaxyName}_{nyear}.npy')
 SYNTHETIC_ATM_NCOUNTS_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'Ncount_atm_after_masking_{galaxyName}_{nyear}.txt')
 SYNTHETIC_ATM_W_MEAN_FORMAT = os.path.join(NUXGAL_SYNTHETICDATA_DIR, 'w_atm_mean_{galaxyName}_{nyear}.txt')

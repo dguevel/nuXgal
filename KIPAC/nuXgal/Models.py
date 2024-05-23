@@ -26,26 +26,36 @@ class Model(object):
                  N_yr,
                  idx_mask=None,
                  save_model=True,
-                 recompute=False):
+                 recompute=False,
+                 gamma=2.5,
+                 path_sig=''):
         self.galaxy_sample = galaxy_sample
         self.name = galaxy_sample.galaxyName
         self.N_yr = N_yr
         self.Ebinmin = 0
         self.Ebinmax = -1
         self.idx_mask = idx_mask
+        self.gamma = gamma
+        self.path_sig = path_sig
         self.pretty_name = '{galaxyName}-{nyear}yr'.format(
             galaxyName=self.name,
             nyear=self.N_yr)
+        
+        path_sig_tail = os.path.split(self.path_sig)[-1].split('.')[0]
+        if len(path_sig_tail) > 0:
+            path_sig_tail = '_' + path_sig_tail
 
         # define filenames
         self.w_mean_fname = Defaults.SYNTHETIC_W_MEAN_FORMAT.format(
             galaxyName=self.name,
-            nyear=self.N_yr,
-            method=self.method_type)
+            nyear=self.N_yr + path_sig_tail,
+            method=self.method_type,
+            gamma=self.gamma)
         self.w_std_fname = Defaults.SYNTHETIC_W_STD_FORMAT.format(
             galaxyName=self.name,
-            nyear=self.N_yr,
-            method=self.method_type)
+            nyear=self.N_yr + path_sig_tail,
+            method=self.method_type,
+            gamma=self.gamma)
         # self.w_atm_std_fname = Defaults.SYNTHETIC_ATM_CROSS_CORR_STD_FORMAT
         # self.w_atm_std_fname = self.w_atm_std_fname.format(
         #    galaxyName=self.name,
@@ -85,7 +95,8 @@ class Model(object):
                 Ebinmin=self.Ebinmin,
                 Ebinmax=self.Ebinmax,
                 idx_mask=self.idx_mask,
-                mc_background=mc_background)
+                mc_background=mc_background,
+                path_sig=self.path_sig)
 
         return self.event_generator
     
@@ -98,7 +109,6 @@ class GalaxyModel(Model):
         w_cross = hp.anafast(self.galaxy_sample.overdensity, lmax=Defaults.MAX_L) / fsky
         self.w_mean = np.array([w_cross for i in range(Defaults.NEbin)]) - 4 * np.pi * fsky / self.galaxy_sample.galaxymap.sum()
         self.w_std = np.zeros_like(self.w_mean)
-
 
 
 class TemplateModel(Model):
@@ -122,13 +132,6 @@ class TemplateModel(Model):
         self.w_mean = np.mean(w_cross, axis=0)
         self.w_std = np.std(w_cross, axis=0)
 
-
-class TemplateSignalModel(TemplateModel):
-    gamma = 2.5
-
-
-class TemplateBackgroundModel(TemplateModel):
-    gamma = 3.7
 
 class AnalyticSignalModel(Model):
     method_type = 'CLASS_analytic'

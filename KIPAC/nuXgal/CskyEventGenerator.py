@@ -21,7 +21,7 @@ class NullEnergyPDFRatioModel(cy.pdf.EnergyPDFRatioModel):
 
 
 class CskyEventGenerator():
-    def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None, mc_background=False):
+    def __init__(self, N_yr, galaxy_sample, gamma=2, Ebinmin=0, Ebinmax=-1, idx_mask=None, mc_background=False, path_sig=''):
         """
         Initialize the CskyEventGenerator object.
 
@@ -83,9 +83,17 @@ class CskyEventGenerator():
         if mc_background:
             for season in self.dataspec:
                 season._keep.append('conv')
+                season._keep.append('MCEq_conv')
+                season._keep.append('MCEq_conv_corrected')
 
-        ana_dir = cy.utils.ensure_dir(Defaults.NUXGAL_ANA_DIR.format(nyear=N_yr, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
-        template_dir = cy.utils.ensure_dir(Defaults.NUXGAL_TEMPLATE_DIR.format(nyear=N_yr, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
+        if path_sig:
+            self.dataspec[0]._path_sig = path_sig
+        path_sig_tail = os.path.split(path_sig)[-1].split('.')[0]
+        if len(path_sig_tail) > 0:
+            path_sig_tail = '_' + path_sig_tail
+
+        ana_dir = cy.utils.ensure_dir(Defaults.NUXGAL_ANA_DIR.format(nyear=N_yr + path_sig_tail, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
+        template_dir = cy.utils.ensure_dir(Defaults.NUXGAL_TEMPLATE_DIR.format(nyear=N_yr + path_sig_tail, galaxyName=self.galaxyName, emin=Ebinmin, emax=Ebinmax))
 
         self.ana = cy.get_analysis(cy.selections.repo, version, self.dataspec, dir=ana_dir, analysis_region_template=~self.density_nu.mask)
         # temporary fix to avoid cluster file transfer problem

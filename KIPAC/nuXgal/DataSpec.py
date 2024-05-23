@@ -1,6 +1,7 @@
 import copy
 
 import csky as cy
+import numpy as np
 
 from . import Defaults
 
@@ -17,6 +18,11 @@ def dataset_modifications_factory(ebinmin, ebinmax):
         sig = ds.sig[sig_idx]
         data_idx = (ds.data['log10energy'] > elo) * (ds.data['log10energy'] < ehi)
         data = ds.data[data_idx]
+
+        if 'sigma' not in sig.keys():
+            sig['sigma'] = np.ones(len(sig))
+        if 'conv' not in sig.keys():
+            sig['conv'] = sig['MCEq_conv_corrected']
 
         ds.sig, ds.data = sig, data
 

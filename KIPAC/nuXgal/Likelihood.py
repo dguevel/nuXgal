@@ -27,7 +27,7 @@ from .FermipyCastro import LnLFn
 from .GalaxySample import GALAXY_LIBRARY
 from .Exposure import ICECUBE_EXPOSURE_LIBRARY
 from .CskyEventGenerator import CskyEventGenerator
-from .Models import DataScrambleBackgroundModel, TemplateSignalModel, MCBackgroundModel
+from .Models import TemplateModel, MCBackgroundModel
 from .DataSpec import data_spec_factory
 
 
@@ -77,7 +77,7 @@ class Likelihood():
     WCovFname = Defaults.SYNTHETIC_W_COV_FORMAT
     neutrino_sample_class = NeutrinoSample
 
-    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False, fit_bounds=[0, 1]):
+    def __init__(self, N_yr, galaxyName, Ebinmin, Ebinmax, lmin, gamma=2.5, recompute_model=False, mc_background=False, fit_bounds=[0, 1], path_sig=''):
         """
         Initialize the Likelihood object.
 
@@ -115,6 +115,7 @@ class Likelihood():
         self.gamma = gamma
         self.mc_background = mc_background
         self.acceptance = None
+        self.path_sig = path_sig
         if fit_bounds is not None:
             self.fit_bounds = [fit_bounds] * (Ebinmax - Ebinmin)
         else:
@@ -124,18 +125,21 @@ class Likelihood():
             self.gs,
             self.N_yr,
             self.idx_mask,
-            recompute=recompute_model
+            recompute=recompute_model,
+            path_sig=path_sig
         )
 
         self.w_atm_mean = self.background_model.w_mean
         self.w_atm_std = self.background_model.w_std
         self.w_atm_std_square = self.w_atm_std ** 2
 
-        self.signal_model = TemplateSignalModel(
+        self.signal_model = TemplateModel(
             self.gs,
             self.N_yr,
             self.idx_mask,
-            recompute=recompute_model
+            recompute=recompute_model,
+            path_sig=path_sig,
+            gamma=gamma
         )
 
         self.w_model_f1 = self.signal_model.w_mean
@@ -158,7 +162,8 @@ class Likelihood():
                 Ebinmin=self.Ebinmin,
                 Ebinmax=self.Ebinmax,
                 idx_mask=self.idx_mask,
-                mc_background=self.mc_background)
+                mc_background=self.mc_background,
+                path_sig=self.path_sig)
         return self._event_generator
     
     @property
@@ -173,7 +178,8 @@ class Likelihood():
                     Ebinmin=i,
                     Ebinmax=i+1,
                     idx_mask=self.idx_mask,
-                    mc_background=False)
+                    mc_background=self.mc_background,
+                    path_sig=self.path_sig)
 
                 self._per_ebin_event_generators.append(eg)
         return self._per_ebin_event_generators
@@ -206,7 +212,9 @@ class Likelihood():
             kwargs['ebinmax'],
             kwargs['lmin'],
             gamma=kwargs['gamma'],
-            fit_bounds=fit_bounds)
+            fit_bounds=fit_bounds,
+            mc_background=kwargs['mc_background'],
+            path_sig=kwargs['path_sig'])
 
         llh.w_data = np.zeros((Defaults.NEbin, Defaults.NCL))
         llh.w_std = np.zeros((Defaults.NEbin, Defaults.NCL))
