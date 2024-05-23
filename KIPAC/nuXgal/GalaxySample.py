@@ -473,12 +473,6 @@ class GalaxySample_unWise_z04(GalaxySample):
         mc = np.zeros(Defaults.NPIXEL)
         mc[lmc] = 1
         mc[smc] = 1
-
-        # NGC 1068 mask
-        ngc1068_idx = hp.ang2pix(Defaults.NSIDE, 40.669622, -0.013294, lonlat=True)
-        ngc1068_idx = np.concatenate([[ngc1068_idx], hp.get_all_neighbours(Defaults.NSIDE, ngc1068_idx)])
-        mc[ngc1068_idx] = 1
-        
         return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (planck_dustmap == 0) | (mc == 1))
 
     def __init__(self):
