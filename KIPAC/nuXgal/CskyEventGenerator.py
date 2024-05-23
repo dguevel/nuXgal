@@ -1,7 +1,6 @@
 import os
 
 import csky as cy
-from csky.inj import RARandomizer, DecRandomizer
 import healpy as hp
 import numpy as np
 from scipy.stats import gaussian_kde
