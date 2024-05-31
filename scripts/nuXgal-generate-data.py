@@ -77,7 +77,7 @@ def main():
                         help='Spectral index')
     parser.add_argument('--fit-bounds', action='store_true',
                         help='Use fit bounds')
-    parser.add_argument('--bootstrap-niter', type=int, default=100,
+    parser.add_argument('--bootstrap-niter', type=int, default=0,
                         help='Number of bootstrap iterations')
     parser.add_argument('--save-countsmap', action='store_true',
                         help='Save counts map')

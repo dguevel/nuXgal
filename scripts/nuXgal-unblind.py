@@ -3,6 +3,8 @@
 import json
 from argparse import ArgumentParser
 
+import numpy as np
+
 from KIPAC.nuXgal.Likelihood import Likelihood
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal import Defaults
@@ -26,7 +28,7 @@ def main():
         galaxy_catalog=args.galaxy_catalog,
         ebinmin=args.ebinmin,
         ebinmax=args.ebinmax,
-        gamma=2.5
+        gamma=2.5,
         lmin=args.lmin,
     )
 
