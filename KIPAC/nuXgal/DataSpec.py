@@ -21,7 +21,7 @@ def dataset_modifications_factory(ebinmin, ebinmax):
 
         if 'sigma' not in sig.keys():
             sig['sigma'] = np.ones(len(sig))
-        if 'conv' not in sig.keys():
+        if ('conv' not in sig.keys()) and ('MCEq_conv_corrected' in sig.keys()):
             sig['conv'] = sig['MCEq_conv_corrected']
 
         ds.sig, ds.data = sig, data
