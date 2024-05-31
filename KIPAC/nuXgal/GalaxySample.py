@@ -552,14 +552,35 @@ class GalaxySample_Flat(GalaxySample):
 
     Simulated flat galaxy sample
     """
+    def __init__(self):
+        """C'tor
+
+        Currently this implements:
+        flat : Poisson generated flat galaxy sample
+
+        Parameters
+        ----------
+        galaxyName : `str`
+            Name for the sample, used to define the sample and specify output file paths
+        idx_galaxymask :
+            Used to ma
+
+        """
+        self.galaxyName = 'flat'
+        self.idx_galaxymask = self.mask()
+        self.f_sky = 1. - len(self.idx_galaxymask[0]) / float(Defaults.NPIXEL)
+        #overdensityalm_path = Defaults.GALAXYALM_FORMAT.format(galaxyName=galaxyName)
+        self.galaxymap = np.ones((Defaults.NPIXEL), float) / Defaults.NPIXEL
+        self.galaxymap[self.idx_galaxymask] = hp.UNSEEN
+        self.galaxymap = hp.ma(self.galaxymap)
+        self.overdensity = self.galaxymap / self.galaxymap.mean() - 1.
+        self.overdensityalm = hp.map2alm(self.overdensity, lmax=Defaults.MAX_L) / self.f_sky
+        self.density = self.galaxymap / np.sum(self.galaxymap)
+
     @staticmethod
     def mask():
         """Contstruct and return the mask for this sample"""
-        return np.where(False)
-
-    def __init__(self):
-        """C'tor"""
-        GalaxySample.__init__("flat", self.mask())
+        return np.where(np.zeros(Defaults.NPIXEL, dtype=bool))
 
 
 class GalaxySampleLibrary:
