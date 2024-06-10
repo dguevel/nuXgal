@@ -11,6 +11,8 @@ import pandas as pd
 from KIPAC.nuXgal.Likelihood import Likelihood
 from KIPAC.nuXgal.NeutrinoSample import NeutrinoSample
 from KIPAC.nuXgal import Defaults
+from KIPAC.nuXgal.GalaxySample import GALAXY_LIBRARY
+from KIPAC.nuXgal.CskyEventGenerator import CskyEventGenerator
 
 def point_source_trial_runner(ra, dec, gamma, ana):
     src = cy.sources(ra, dec, deg=True)
@@ -93,6 +95,8 @@ def main():
                         help='CSV file containing point source information')
     parser.add_argument('--path-sig', type=str, default='',
                         help='Path to MC signal file if not using default')
+    parser.add_argument('--isotropic', type=float, default=0,
+                        help='Add an isotropic component by fraction of measured')
 
     args = parser.parse_args()
 
@@ -130,6 +134,21 @@ def main():
                 ra, dec, 2.5, llh.event_generator.ana))
             ninj_pts.append(int(pnts_trial_runners[-1].to_ns(flux_pt, E0=1, unit=1e3)))
 
+    if args.isotropic:
+        isotropic_galaxy_sample = GALAXY_LIBRARY.get_sample('flat')
+        isotropic_event_generator = CskyEventGenerator(
+            args.N_yr,
+            isotropic_galaxy_sample,
+            gamma=2.28,
+            Ebinmin=args.ebinmin,
+            Ebinmax=args.ebinmax,
+            idx_mask=llh.idx_mask,
+            mc_background=args.mcbg,
+            path_sig=args.path_sig
+        )
+        isotropic_counts = isotropic_event_generator.trial_runner.to_ns(
+            (1e5)**2 * 1.44e-18 * llh.f_sky * 4 * np.pi, E0=1e5, unit=1)
+
     result_list = []
 
     for ninj in args.inject:
@@ -143,8 +162,14 @@ def main():
                 for n, ptr in zip(ninj_pts, pnts_trial_runners):
                     pts_trial = ptr.get_one_trial(n)[0]
                     trial = append_signal_trials(trial, pts_trial)
+            if args.isotropic:
+                isotropic_trial = isotropic_event_generator.SyntheticTrial(
+                    int(args.isotropic * isotropic_counts))[0]
+                trial = append_signal_trials(trial, isotropic_trial)
             ns = NeutrinoSample()
             ns.inputTrial(trial)
+            if llh.acceptance is None:
+                llh.acceptance = ns.calc_effective_area(llh.event_generator.ana)
             llh.inputData(ns, bootstrap_niter=args.bootstrap_niter)
 
             result_dict = {}

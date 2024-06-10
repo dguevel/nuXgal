@@ -35,6 +35,7 @@ def main():
             data['gamma'] = args.gamma
             data['mc_background'] = True
             data['path_sig'] = args.path_sig
+            data['galaxy_catalog'] = 'unWISE_z=0.4'
             if 'llh' not in locals():
                 llh = Likelihood.init_from_run(**data)
                 llh.Ncount = np.zeros(Defaults.NEbin)
