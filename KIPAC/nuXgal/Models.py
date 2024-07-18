@@ -124,9 +124,11 @@ class TemplateModel(Model):
             trial, _ = eg.SyntheticTrial(1000000,
                                          keep_total_constant=False,
                                          signal_only=True)
-            ns.inputTrial(trial)
+            ns.inputTrial(trial, ana=eg.ana)
             ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+            if iteration == 0:
+                acceptance = ns.calc_effective_area(eg.ana)
+            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample, acceptance=acceptance)
 
         self.w_trials = w_cross.copy()
         self.w_mean = np.mean(w_cross, axis=0)
@@ -196,10 +198,11 @@ class DataScrambleBackgroundModel(Model):
         for iteration in tqdm(np.arange(N_re)):
 
             trial, _ = eg.SyntheticTrial(0)
-            ns.inputTrial(trial)
+            ns.inputTrial(trial, ana=eg.ana)
             ns.updateMask(self.idx_mask)
             if estimator == 'anafast':
-                w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+                acceptance = ns.calc_effective_area(eg.ana)
+                w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample, acceptance=acceptance)
             elif estimator == 'polspice':
                 w_cross[iteration] = ns.getCrossCorrelationPolSpice(self.galaxy_sample, ana)
 
@@ -243,7 +246,8 @@ class MCScrambleBackgroundModel(Model):
         ns = NeutrinoSample()
         ns.inputCountsmap(nu_map)
         ns.updateMask(self.idx_mask)
-        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample)
+        acceptance = ns.calc_effective_area(eg.ana)
+        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample, acceptance=acceptance)
 
         self.w_std = np.zeros_like(self.w_mean)
 
@@ -262,11 +266,17 @@ class MCBackgroundModel(Model):
 
         for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
 
+            ns = NeutrinoSample()
+            ns.build_aeff_matrix(eg.ana)
+
             mc = []
             weight = []
             for bg_inj in eg.trial_runner.bg_injs:
                 idx = (bg_inj.mc['log10energy'] >= elo) * (bg_inj.mc['log10energy'] < ehi)
                 mc.append(bg_inj.mc['sindec'][idx])
+                #area = ns.lookup_aeff(bg_inj.mc['sindec'][idx], bg_inj.mc['log10energy'][idx])
+                #energy = 10**bg_inj.mc['log10energy'][idx]
+                #weight.append(bg_inj.probs[0][idx] * energy / area)
                 weight.append(bg_inj.probs[0][idx])
 
             mc = np.concatenate(mc)
@@ -287,9 +297,8 @@ class MCBackgroundModel(Model):
         ns = NeutrinoSample()
         ns.inputCountsmap(nu_map)
         ns.updateMask(self.idx_mask)
-        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample)
-
-
+        acceptance = ns.calc_effective_area(eg.ana)
+        self.w_mean = ns.getCrossCorrelation(self.galaxy_sample, acceptance=acceptance)
         self.w_std = np.zeros_like(self.w_mean)
 
 
@@ -380,9 +389,10 @@ class DataHistogramBackgroundModel(Model):
         for iteration in tqdm(np.arange(N_re)):
 
             trial = self._generate_synthetic_trial()
-            ns.inputTrial(trial)
+            ns.inputTrial(trial, self.event_generator.ana)
             ns.updateMask(self.idx_mask)
-            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample)
+            acceptance = ns.calc_effective_area(eg.ana)
+            w_cross[iteration] = ns.getCrossCorrelation(self.galaxy_sample, acceptance=acceptance)
 
         self.w_trials = w_cross.copy()
         self.w_mean = np.mean(w_cross, axis=0)
@@ -390,7 +400,7 @@ class DataHistogramBackgroundModel(Model):
 
 
 class FlatBackgroundModel(Model):
-    method_type = 'flat'
+    method_type = 'flat_bg'
     gamma = 3.7
 
     def calc_w_mean(self, N_re=500):

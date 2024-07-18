@@ -242,6 +242,10 @@ class Likelihood():
             ns.inputCountsmap(countsmap)
             llh.inputData(ns, bootstrap_niter=0)
 
+        llh.neutrino_sample = llh.neutrino_sample_class()
+        llh.neutrino_sample.build_aeff_matrix(llh.event_generator.ana)
+        llh.neutrino_sample.build_aeff_map()
+
         return llh
 
     def anafastMask(self):
@@ -360,7 +364,45 @@ class Likelihood():
             lnL_le += norm.logpdf(
                 w_data, loc=w_model_mean, scale=w_std)
         return np.sum(lnL_le)
+
+    def log_likelihood_free_atm(self, fcorr, fatm):
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            lnL_le += self.log_likelihood_free_atm_Ebin(fcorr[i], fatm[i], ebin)
+        return lnL_le
+
+    def log_likelihood_free_atm_Ebin(self, fcorr, fatm, energyBin):
+
+        w_data = self.w_data[energyBin, self.lmin:]
+
+        w_model_mean = (self.w_model_f1[energyBin, self.lmin:] * fcorr)
+        w_model_mean += (self.w_atm_mean[energyBin, self.lmin:] * fatm)
+
+        lnL_le = self.multi_norm[energyBin - self.Ebinmin].logpdf(w_data - w_model_mean)
+
+        return lnL_le
+
     
+    def minimize__lnL_free_atm(self):
+        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:], allow_singular=True) for i in range(self.Ebinmin, self.Ebinmax)]
+
+        def minfunc(pars):
+            return -self.log_likelihood_free_atm(pars[0:3], pars[3:6])
+        initial = [0 for i in range(Defaults.NEbin)]
+        initial += [1 for i in range(Defaults.NEbin)]
+
+        res = minimize(minfunc, initial)
+
+        initial = [1 for i in range(Defaults.NEbin)]
+
+        def minfunc2(pars):
+            return -self.log_likelihood_free_atm([0, 0, 0], pars[0:3])
+
+        res_bg = minimize(minfunc2, initial)
+
+        ts = -2 * (res.fun - res_bg.fun)
+        return res.x, ts
+
     def log_likelihood_cov(self, f):
         """Compute the log of the likelihood for a particular model
 
@@ -413,6 +455,33 @@ class Likelihood():
 
         lnL_le = self.multi_norm[energyBin].logpdf(w_data - w_model_mean)
         return lnL_le
+
+    def log_likelihood_free_bg_ns_gamma(self, pars):
+        fcorr, gamma = pars[:2]
+        fcorr = self.fi_given_f_gamma(fcorr, gamma)
+        fatm, gammaatm = pars[2:]
+        fatm = self.fi_given_f_gamma(fatm, gammaatm)
+
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_data = self.w_data[ebin, self.lmin:]
+
+            w_model_mean = self.w_model_f1[ebin, self.lmin:] * fcorr[i]
+            w_model_mean += self.w_atm_mean[ebin, self.lmin:] * fatm[i]
+
+            w_cov = self.w_cov[ebin, self.lmin:, self.lmin:]
+
+            #lnL_le += multivariate_normal.logpdf(
+            #    w_data - w_model_mean, cov=w_cov, allow_singular=False)
+            lnL_le += self.multi_norm[i].logpdf(w_data - w_model_mean)
+        return lnL_le
+
+    def minimize__lnL_free_bg_ns_gamma(self):
+        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:], allow_singular=True) for i in range(self.Ebinmin, self.Ebinmax)]
+        res = minimize(lambda pars: -self.log_likelihood_free_bg_ns_gamma(pars), [.1, 2.5, 1, 3.0], bounds=((0, None), (1, 4), (0, None), (1, 4)), method='Nelder-Mead')
+        res2 = minimize(lambda pars: -self.log_likelihood_free_bg_ns_gamma([0, 2.5] + list(pars)), [1, 3.0], bounds=((0, None), (1, 4)), method='Nelder-Mead')
+        ts = -2 * (res.fun - res2.fun)
+        return res.x, ts
 
     def chi_square_Ebin(self, f, energyBin):
         """
@@ -644,6 +713,29 @@ class Likelihood():
         f = self.f_given_ns_gamma(ns, gamma)
         return self.log_likelihood_cov(f)
 
+    def log_likelihood_free_bg(self, pars):
+        fcorr, gamma = pars[:2]
+        fcorr = self.f_given_ns_gamma(fcorr, gamma)
+        fatm = pars[2:]
+
+        lnL_le = 0
+        for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+            w_data = self.w_data[ebin, self.lmin:]
+
+            w_model_mean = self.w_model_f1[ebin, self.lmin:] * fcorr[i]
+            w_model_mean += self.w_atm_mean[ebin, self.lmin:] * fatm[i]
+
+            lnL_le += self.multi_norm[i].logpdf(w_data - w_model_mean)
+        return lnL_le
+
+    def minimize__lnL_free_bg(self):
+        self.multi_norm = [multivariate_normal(cov=self.w_cov[i, self.lmin:, self.lmin:], allow_singular=True) for i in range(self.Ebinmin, self.Ebinmax)]
+
+        res = minimize(lambda pars: -self.log_likelihood_free_bg(pars), [1000, 2.5, 1, 1, 1], bounds=((0, None), (1, 4), (None, None), (None, None), (None, None)), method='Nelder-Mead')
+        res2 = minimize(lambda pars: -self.log_likelihood_free_bg([0, 2.5] + list(pars)), [1, 1, 1], bounds=((None, None), (None, None), (None, None)), method='Nelder-Mead')
+        ts = -2 * (res.fun - res2.fun)
+        return res.x, ts
+
     def f_given_ns_gamma(self, ns, gamma):
         """
         Convert a given astrophysical neutrino count to a signal fraction in 
@@ -666,6 +758,146 @@ class Likelihood():
         acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
         f = ns * acc_ebin / acc_total / n_total
         return f
+    
+    #def f_given_ns_gamma(self, ns, gamma):
+        #n_total = self.Ncount
+        #if not hasattr(self, '_acc_total_interp'):
+        #    self._build_acc_interps()
+        #acc_ebin = np.array([self._acc_ebin_interp[i](gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        #acc_total = self._acc_total_interp(gamma)
+        #f = ns * acc_ebin / acc_total / n_total
+        #return f
+
+        #if not hasattr(self, '_acc_total_interp'):
+        #    self._build_acc_interps()
+        #acc_ebin_weight = np.array([self._acc_ebin_interp[i](gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        #acc_total_weight = self._acc_total_interp(gamma)
+        #f = ns * acc_ebin_weight / acc_total_weight / self.Ncount
+        #return f
+    
+    def fi_given_f_gamma(self, f, gamma):
+        """
+        Convert a given astrophysical neutrino count to a signal fraction in 
+        each energy bin with spectral index gamma
+        
+        Parameters
+        ----------
+        ns : `float`
+            The number of neutrino events
+        gamma : `float`
+            The spectral index of the neutrino flux
+
+        Returns
+        -------
+        f : `array`
+            The signal fraction in each energy bin
+        """
+        acc_total = self.acc_total(gamma)
+        acc_ebin = np.array([self.acc_ebin(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        f = f * acc_ebin / acc_total
+        return f
+    
+    def f2n(self, f, gamma):
+        factor = self.acc_aeff_weighted(gamma) / np.mean(self.neutrino_sample.countsmap)
+        return f / factor
+    
+    def n2f(self, n, gamma):
+        factor = self.acc_aeff_weighted(gamma) / np.mean(self.neutrino_sample.countsmap)
+        return n * factor
+    
+    def fi_given_f_gamma(self, f, gamma):
+        acc_total = self.acc_aeff_weighted(gamma)
+        acc_ebin = np.array([self.acc_ebin_aeff_weighted(i, gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+
+        if not hasattr(self, '_acc_total_interp'):
+            self._build_acc_interps()
+        acc_ebin = np.array([self._acc_ebin_interp[i](gamma) for i in range(self.Ebinmin, self.Ebinmax)])
+        acc_total = self._acc_total_interp(gamma)
+        f = f * acc_ebin / acc_total
+        return f
+
+        #fi = []
+        #for i in range(self.Ebinmin, self.Ebinmax):
+        #    Aeff = self.neutrino_sample.effective_area_map[i]
+        #    Aeff[self.idx_mask] = hp.UNSEEN
+        #    Aeff = hp.ma(Aeff)
+        #    denom = np.mean(self.Ncount[i] / Aeff[i])
+        #    numer = np.mean(self.acc_ebin(i, gamma) / Aeff[i])
+        #    fi.append(f * numer / denom)
+
+        #Aeff = self.neutrino_sample.effective_area_map.sum(axis=0)
+        #Aeff[self.idx_mask] = hp.UNSEEN
+        #Aeff = hp.ma(Aeff)
+        #f_tot = np.mean(self.acc_total(gamma) / Aeff)
+        #return np.array(fi) / f_tot
+
+        #fi = []
+        #for i in range(self.Ebinmin, self.Ebinmax):
+        #    elo, ehi = 10**Defaults.map_logE_edge[i], 10**Defaults.map_logE_edge[i + 1]
+        #    fi.append((ehi**(2-gamma) - elo**(2-gamma)) / (2 - gamma))
+        #fi = np.array(fi)
+
+        #flux_tot = self.Ncount / Defaults.NPIXEL
+
+        #return f * fi / flux_tot
+
+        #fi = []
+        #for i, ebin in enumerate(range(self.Ebinmin, self.Ebinmax)):
+        #    phi0 = self.per_ebin_event_generators[ebin].trial_runner.to_dNdE(f, unit=1, gamma=gamma) * self.event_generator.ana[0].livetime
+        #    elo = Defaults.map_logE_edge[ebin]
+        #    ehi = Defaults.map_logE_edge[ebin + 1]
+        #    E0 = 1
+        #    if gamma == 2.:
+        #        dNdE = np.log(ehi/elo) * phi0 / E0
+        #    else:
+        #        dNdE = phi0 / (2-gamma) / E0**(1-gamma) * (ehi**(2-gamma) - elo**(2-gamma))
+        #    fi.append(dNdE / self.Ncount[i])
+        #return fi
+        
+
+    def _build_acc_interps(self):
+        from scipy.interpolate import interp1d
+        gammas = np.arange(1, 4.25, 0.25)
+        self._acc_ebin_interp = []
+        for i in range(Defaults.NEbin):
+            accs = []
+            for g in gammas:
+                accs.append(self.acc_ebin_aeff_weighted(i, g))
+            self._acc_ebin_interp.append(interp1d(gammas, accs, kind='linear'))
+
+        accs = []
+        for g in gammas:
+            accs.append(self.acc_aeff_weighted(g))
+        self._acc_total_interp = interp1d(gammas, accs)
+
+    def acc_ebin_aeff_weighted(self, ebin, gamma):
+        ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+        evt = cy.utils.Events(sindec=np.sin(np.radians(dec)))
+        acc_map = np.zeros(Defaults.NPIXEL)
+        for subana in self.per_ebin_event_generators[ebin].ana:
+            acc_map += subana.acc_param(evt, gamma=gamma)
+        acc_map[self.idx_mask] = hp.UNSEEN
+        acc_map = hp.ma(acc_map)
+
+        nu_map = self.event_generator.density_nu
+        weighted_acc = np.mean(nu_map / acc_map)
+        return weighted_acc
+    
+    def acc_aeff_weighted(self, gamma):
+        ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+        evt = cy.utils.Events(sindec=np.sin(np.radians(dec)))
+        acc_map = np.zeros(Defaults.NPIXEL)
+        for subana in self.event_generator.ana:
+            acc_map += subana.acc_param(evt, gamma=gamma)
+
+        acc_map[self.idx_mask] = hp.UNSEEN
+        acc_map = hp.ma(acc_map)
+
+        nu_map = self.event_generator.density_nu
+        weighted_acc = np.mean(nu_map / acc_map)
+        return weighted_acc
+
+
 
     def acc_ebin(self, ebin, gamma):
         return self.per_ebin_event_generators[ebin].trial_runner.get_acc_total(gamma=gamma)
@@ -702,7 +934,15 @@ class Likelihood():
             for ana in anas:
                 evts = ana.sig
                 self._acceptances[-1].append(cy.pdf.SinDecAccParametrization(evts))
-            
+
+    def chi_square_free_bg(self, pars):
+        constant = 0
+        k = Defaults.NCL - self.lmin
+        for i in range(self.Ebinmin, self.Ebinmax):
+            constant += -1/2 * np.linalg.slogdet(self.w_cov[i, self.lmin:, self.lmin:])[1]
+            constant += -k / 2 * np.log(2 * np.pi)
+        chi_square = self.log_likelihood_free_bg(pars) - constant
+        return -2*chi_square
 
     def plotCastro(self, TS_threshold=4, coloralphalimit=0.01, colorfbin=500):
         """Make a 'Castro' plot of the likelihood

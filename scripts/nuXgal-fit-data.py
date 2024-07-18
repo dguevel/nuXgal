@@ -41,14 +41,16 @@ def main():
                 llh.Ncount = np.zeros(Defaults.NEbin)
                 for ebin in range(Defaults.NEbin):
                     llh.Ncount[ebin] = data['n_total_i'][str(ebin)]
+                    llh.Ncount_unweighted = np.array([data['n_total_i'][str(ebin)] for ebin in range(Defaults.NEbin)])
             else:
                 llh.w_data = np.zeros((llh.Ebinmax - llh.Ebinmin, Defaults.NCL))
                 for j, ebin in enumerate(range(data['ebinmin'], data['ebinmax'])):
                     llh.w_data[j] = np.array(data['cls'][str(ebin)])
 
                 llh.Ncount = np.array([data['n_total_i'][str(ebin)] for ebin in range(Defaults.NEbin)])
+                llh.Ncount_unweighted = np.array([data['n_total_i'][str(ebin)] for ebin in range(Defaults.NEbin)])
 
-            f_fit, result_dict["TS"] = llh.minimize__lnL_cov()
+            f_fit, result_dict["TS"] = llh.minimize__lnL_free_atm()
             result_dict["f_fit"] = f_fit.tolist()
             result_dict['TS_i'] = []
             result_dict['chi_square'] = []
@@ -59,13 +61,9 @@ def main():
                 result_dict['n_fit'].append(result_dict['f_fit'][i] * data['n_total_i'][str(ebin)])
             result_dict['flux_fit'] = float(data['n_to_flux'] * sum(result_dict['n_fit']))
 
-            f_fit, result_dict["TS_ns_gamma"] = llh.minimize__lnL_ns_gamma()
-            result_dict["ns_gamma_fit"] = f_fit.tolist()
-            result_dict['TS_i_ns_gamma'] = []
-            for i, ebin in enumerate(range(llh.Ebinmin, llh.Ebinmax)):
-                result_dict['TS_i_ns_gamma'].append(2 * (llh.log_likelihood_cov_Ebin(result_dict['f_fit'][i], ebin) - llh.log_likelihood_cov_Ebin(0, ebin)))
-            result_dict['flux_fit_ns_gamma'] = float(data['n_to_flux'] * result_dict['ns_gamma_fit'][0])
-            result_dict['chi_square_ns_gamma'] = llh.chi_square_ns_gamma(*result_dict['ns_gamma_fit'])
+            f_fit, result_dict["TS_f_gamma"] = llh.minimize__lnL_free_bg()
+            result_dict["f_gamma_fit"] = f_fit.tolist()
+            result_dict["chi_square_f_gamma"] = llh.chi_square_free_bg(f_fit)
 
             result_list.append(result_dict)
 

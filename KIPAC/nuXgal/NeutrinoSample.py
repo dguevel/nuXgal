@@ -38,8 +38,9 @@ class NeutrinoSample():
             self.bl_fnames.append(bl_fname)
             self.bl[ebin] = np.load(bl_fname)
 
-    def inputTrial(self, trial):
+    def inputTrial(self, trial, ana):
         self.event_list = trial
+        self.build_aeff_matrix(ana)
         self.countsMap()
         self.countsmap_fullsky = self.countsmap.copy()
 
@@ -53,10 +54,51 @@ class NeutrinoSample():
                     idx = (tr['log10energy'] > elo) * (tr['log10energy'] < ehi)
                     ra = np.degrees(tr['ra'][idx])
                     dec = np.degrees(tr['dec'][idx])
+                    loge = tr['log10energy'][idx]
+                    #area = self.lookup_aeff(np.sin(np.radians(dec)), loge)
+                    #energy = 10**loge
                     pixels = hp.ang2pix(Defaults.NSIDE, ra, dec, lonlat=True)
                     bins = np.arange(Defaults.NPIXEL+1)
+                    #countsmap[i] += np.histogram(pixels, bins=bins, weights=energy/area)[0]
                     countsmap[i] += np.histogram(pixels, bins=bins)[0]
         self.countsmap = countsmap
+
+    def build_aeff_matrix(self, ana):
+        #sindec_bins = ana[0].spec._bins_sindec
+        sindec_bins = np.linspace(-1, 1, 41)
+        dsindec = np.diff(sindec_bins)
+        loge_bins = np.linspace(2.5, 5.5, 4)
+        dlogE = 1
+        #dlogE = np.diff(ana[0].spec._bins_logenergy)[0]
+        #loge_bins = ana[0].spec._bins_logenergy
+        ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+        aeff = np.zeros((len(sindec_bins)-1, len(loge_bins)-1))
+
+        for subana in ana:
+            
+            solid_angle = 2*np.pi*(dsindec)
+            sr_idx = np.digitize(np.sin(subana.sig.dec), sindec_bins)
+            sr_idx = np.clip(sr_idx, 0, len(dsindec)-1)
+            solid_angle = 2 * np.pi * dsindec[sr_idx]
+            
+            area = 1 / (1e4*np.log(10)) * (subana.sig.oneweight / (subana.sig.true_energy * solid_angle * dlogE))
+            aeff += np.histogram2d(np.sin(subana.sig.dec), np.log10(subana.sig.true_energy), bins=(sindec_bins, loge_bins), weights=area)[0]
+
+        self.sindec_bins = sindec_bins
+        self.loge_bins = loge_bins
+        self.aeff_matrix = aeff
+
+    def lookup_aeff(self, sindec, loge):
+        sindec_idx = np.clip(np.digitize(sindec, self.sindec_bins), 0, len(self.sindec_bins)-2)
+        loge_idex = np.clip(np.digitize(loge, self.loge_bins), 0, len(self.loge_bins)-2)
+        return self.aeff_matrix[sindec_idx, loge_idex]
+    
+    def build_aeff_map(self):
+        ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+        self.effective_area_map = np.zeros((self.loge_bins.size - 1, Defaults.NPIXEL))
+        for i in range(len(self.loge_bins) - 1):
+            sindec_idx = np.clip(np.digitize(np.sin(np.radians(dec)), self.sindec_bins), 0, len(self.sindec_bins)-2)
+            self.effective_area_map[i] = self.aeff_matrix[sindec_idx, i]
 
     def inputCountsmap(self, countsmap):
         """Set the counts map
@@ -403,6 +445,7 @@ class NeutrinoSample():
         sindec_bins = np.arange(-1, 1.1, dsindec)
         effective_area_map = np.zeros((Defaults.NEbin, Defaults.NPIXEL))
         ra, dec = hp.pix2ang(Defaults.NSIDE, np.arange(Defaults.NPIXEL), lonlat=True)
+        gammas = np.arange(2, 4, 0.1)
 
         for i, (elo, ehi) in enumerate(zip(Defaults.map_logE_edge[:-1], Defaults.map_logE_edge[1:])):
             for subana in ana:
@@ -410,11 +453,13 @@ class NeutrinoSample():
                 mask &= subana.sig.log10energy < ehi
 
                 dlogE = ehi - elo
+                dE = 10**ehi - 10**elo
                 solid_angle = 2*np.pi*(dsindec)
-                area = 1 / (1e4*np.log(10)) * (subana.sig.oneweight[mask] / (subana.sig.true_energy[mask] * solid_angle * dlogE))
-                hist, bins = np.histogram(np.sin(subana.sig.dec[mask]), bins=sindec_bins, weights=area)
-                bins_center = (bins[1:] + bins[:-1]) / 2
-                interp = scipy.interpolate.interp1d(bins_center, hist, kind='nearest', fill_value='extrapolate', bounds_error=False)
-                effective_area_map[i] += interp(np.sin(np.radians(dec))) * subana.livetime
+                for gamma in gammas:
+                    area = subana.sig.oneweight[mask] * subana.sig.true_energy[mask]**-gamma / solid_angle / dE
+                    hist, bins = np.histogram(np.sin(subana.sig.dec[mask]), bins=sindec_bins, weights=area)
+                    bins_center = (bins[1:] + bins[:-1]) / 2
+                    interp = scipy.interpolate.interp1d(bins_center, hist, kind='nearest', fill_value='extrapolate', bounds_error=False)
+                    effective_area_map[i] += np.maximum(hp.smoothing(interp(np.sin(np.radians(dec))) * subana.livetime, np.radians(5)), 0)
 
         return effective_area_map

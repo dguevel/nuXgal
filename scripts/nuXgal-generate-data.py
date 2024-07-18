@@ -14,6 +14,16 @@ from KIPAC.nuXgal import Defaults
 from KIPAC.nuXgal.GalaxySample import GALAXY_LIBRARY
 from KIPAC.nuXgal.CskyEventGenerator import CskyEventGenerator
 
+def calc_f_inj(llh, ninj, trial):
+    ninj_i = find_n_inj_per_bin(trial, llh.Ebinmin, llh.Ebinmax)
+    if not (llh.acceptance is None):
+        flux_inj = np.sum(((llh.event_generator.density_nu / llh.acceptance).T * ninj_i).T, axis=0)
+        flux_total = np.sum(llh.neutrino_sample.countsmap / llh.acceptance, axis=0)
+        f_inj = flux_inj.sum() / flux_total.sum()
+    else:
+        f_inj = np.sum(ninj_i) / np.sum(llh.Ncount)
+    return f_inj
+
 def point_source_trial_runner(ra, dec, gamma, ana):
     src = cy.sources(ra, dec, deg=True)
     cy.CONF['ana'] = ana
@@ -167,7 +177,7 @@ def main():
                     int(args.isotropic * isotropic_counts))[0]
                 trial = append_signal_trials(trial, isotropic_trial)
             ns = NeutrinoSample()
-            ns.inputTrial(trial)
+            ns.inputTrial(trial, ana=llh.event_generator.ana)
             if llh.acceptance is None:
                 llh.acceptance = ns.calc_effective_area(llh.event_generator.ana)
             llh.inputData(ns, bootstrap_niter=args.bootstrap_niter)
@@ -182,7 +192,7 @@ def main():
             result_dict['n_total_i'] = dict(zip(range(args.ebinmin, args.ebinmax), llh.Ncount[args.ebinmin:args.ebinmax].astype(int).tolist()))
             result_dict['n_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)))
             result_dict['f_inj_i'] = dict(zip(range(args.ebinmin, args.ebinmax), (find_n_inj_per_bin(trial, args.ebinmin, args.ebinmax)/llh.Ncount[args.ebinmin:args.ebinmax]).tolist()))
-            result_dict['f_inj'] = float(result_dict['n_inj'] / result_dict['n_total'])
+            result_dict['f_inj'] = calc_f_inj(llh, ninj, trial)
             result_dict['flux_inj'] = llh.event_generator.trial_runner.to_dNdE(ninj, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
             result_dict['n_to_flux'] = llh.event_generator.trial_runner.to_dNdE(1, E0=1e5, gamma=2.5) / (4*np.pi*llh.f_sky)
             result_dict['gamma_inj'] = args.gamma
