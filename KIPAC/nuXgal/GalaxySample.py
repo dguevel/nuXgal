@@ -465,7 +465,8 @@ class GalaxySample_unWise_z04(GalaxySample):
                           dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
         
         # planck dust map
-        planck_dustmap = hp.read_map('/home/dguevel/git/nuXgal/data/ancil/HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
+        planck_dustmap_file = os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
+        planck_dustmap = hp.read_map(planck_dustmap_file)
 
         # large and small magellanic clouds
         lmc = hp.query_disc(Defaults.NSIDE, hp.ang2vec(80.894200, -69.756100, lonlat=True), 5*np.pi/180)

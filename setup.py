@@ -9,7 +9,7 @@ setup(
     author_email='',
     description='A Python package for analysis of neutrino galaxy cross correlations',
     license='gpl2',
-    packages=find_packages(),
+    packages=['KIPAC.nuXgal'],
     include_package_data=True,
     url="https://github.com/dguevel/nuXgal",
     classifiers=[
@@ -31,8 +31,6 @@ setup(
         'astropy >= 3.2.2',
         'matplotlib >= 3.1.1',
         'scipy >= 1.3.1',
-        'numba >= 0.45.1',
-        'pytest >= 5.2.1',
         'healpy >= 1.12.0',
         'emcee',
         'corner',

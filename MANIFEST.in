@@ -1,0 +1,5 @@
+include KIPAC/nuXgal/data/*
+include KIPAC/nuXgal/data/ancil/*
+include KIPAC/nuXgal/data/ana/*
+include KIPAC/nuXgal/data/irfs/*
+include KIPAC/nuXgal/syntheticData/*
