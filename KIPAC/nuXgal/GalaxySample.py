@@ -453,6 +453,33 @@ class GalaxySample_Wise(GalaxySample):
         GalaxySample.__init__(self, "WISE", self.mask())
 
 
+class Synfast(GalaxySample):
+    """WISE Galaxy sample
+
+    Synfast instance of WISE-2MASS galaxy sample map based on ~5M galaixes
+    """
+    @staticmethod
+    def mask():
+        """Contstruct and return the mask for this sample"""
+        c_icrs = SkyCoord(ra=Defaults.exposuremap_phi * u.radian,
+                          dec=(np.pi/2 - Defaults.exposuremap_theta)*u.radian, frame='icrs')
+        
+        # planck dust map
+        planck_dustmap_file = os.path.join(Defaults.NUXGAL_ANCIL_DIR, 'HFI_Mask_GalPlane-apo0_2048_R2.00_nside128.fits')
+        planck_dustmap = hp.read_map(planck_dustmap_file)
+
+        # large and small magellanic clouds
+        lmc = hp.query_disc(Defaults.NSIDE, hp.ang2vec(80.894200, -69.756100, lonlat=True), 5*np.pi/180)
+        smc = hp.query_disc(Defaults.NSIDE, hp.ang2vec(13.158300, -72.800300, lonlat=True), 5*np.pi/180)
+        mc = np.zeros(Defaults.NPIXEL)
+        mc[lmc] = 1
+        mc[smc] = 1
+        return np.where((np.abs(c_icrs.galactic.b.degree) < 10) | (planck_dustmap == 0) | (mc == 1))
+
+    def __init__(self):
+        """C'tor"""
+        GalaxySample.__init__(self, "synfast", self.mask())
+
 class GalaxySample_unWise_z04(GalaxySample):
     """WISE Galaxy sample
 
@@ -596,6 +623,7 @@ class GalaxySampleLibrary:
         'unWISE_z=0.6': GalaxySample_unWise_z06,
         'unWISE_z=1.0': GalaxySample_unWise_z10,
         'unWISE_z=1.5': GalaxySample_unWise_z15,
+        'synfast': Synfast,
         'Atmospheric': GalaxySample_Atmospheric,
         'SDSS_z0.0_0.1': GalaxySample_SDSS_00_01,
         'SDSS_z0.1_0.2': GalaxySample_SDSS_01_02,

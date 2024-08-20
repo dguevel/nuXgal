@@ -107,6 +107,7 @@ def main():
                         help='Path to MC signal file if not using default')
     parser.add_argument('--isotropic', type=float, default=0,
                         help='Add an isotropic component by fraction of measured')
+    parser.add_argument('--inj-template', default='')
 
     args = parser.parse_args()
 
@@ -158,13 +159,30 @@ def main():
         )
         isotropic_counts = isotropic_event_generator.trial_runner.to_ns(
             (1e5)**2 * 1.44e-18 * llh.f_sky * 4 * np.pi, E0=1e5, unit=1)
+        
+    if args.inj_template:
+        inj_galaxy_sample = GALAXY_LIBRARY.get_sample(args.inj_template)
+        inj_event_generator = CskyEventGenerator(
+            args.N_yr,
+            inj_galaxy_sample,
+            gamma=2.28,
+            Ebinmin=args.ebinmin,
+            Ebinmax=args.ebinmax,
+            idx_mask=llh.idx_mask,
+            mc_background=args.mcbg,
+            path_sig=args.path_sig
+        )
 
     result_list = []
 
     for ninj in args.inject:
         for i in tqdm(np.arange(args.n_trials)):
-            trial = llh.event_generator.SyntheticTrial(
-                ninj, keep_total_constant=False)[0]
+            if args.inj_template:
+                trial = inj_event_generator.SyntheticTrial(
+                    ninj, keep_total_constant=False)[0]
+            else:
+                trial = llh.event_generator.SyntheticTrial(
+                    ninj, keep_total_constant=False)[0]
             if args.pnt_src:
                 pt_trial = pnt_trial_runner.get_one_trial(ninj_pt)[0]
                 trial = append_signal_trials(trial, pt_trial)
