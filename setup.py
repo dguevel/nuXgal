@@ -31,7 +31,7 @@ setup(
         'astropy >= 3.2.2',
         'matplotlib >= 3.1.1',
         'scipy >= 1.3.1',
-        'healpy >= 1.12.0',
+        'healpy >= 1.16.0',
         'emcee',
         'corner',
         'tqdm',
